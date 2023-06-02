@@ -25,6 +25,8 @@ add_lit_testsuite(check-stablehlo-tests "Running the tests/ suite"
   FileCheck
   stablehlo-opt
   stablehlo-translate
+  PARAMS
+  "xla_cc_lib_path=${XLA_DIR}/bazel-bin/xla/libxla_cc_shared.so"
 )
 add_dependencies(check-stablehlo-quick check-stablehlo-tests)
 
