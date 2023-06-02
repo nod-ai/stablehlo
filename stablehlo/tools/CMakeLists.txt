@@ -26,6 +26,7 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIROptLib
+        StablehloXlaPasses
         StablehloRegister
         StablehloTestUtils
         StablehloPasses
