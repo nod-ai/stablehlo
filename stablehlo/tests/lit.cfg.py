@@ -27,6 +27,9 @@ config.name = 'STABLEHLO_TESTS_SUITE'
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 config.suffixes = ['.mlir']
 config.test_source_root = os.path.dirname(__file__)
+config.substitutions.append(
+    ("%xla_cc_lib_path", llvm_config.lit_config.params['xla_cc_lib_path'])
+)
 
 # Make LLVM and StableHLO tools available in RUN directives
 tools = [

@@ -77,7 +77,20 @@ Here's how to build the StableHLO repo on Linux or macOS:
 
    Again, you need to do this every time `llvm_version.txt` changes.
 
-6. Build StableHLO as a standalone library:
+6. Clone, Configure and build XLA:
+   ```sh
+   # On Linux
+   sudo apt install gcc-10 g++-10
+   ```
+   [Install Bazel](https://bazel.build/install).
+   ```sh
+   git clone -b xla_cc https://github.com/nod-ai/xla/tree/xla_cc xla
+   ```
+   ```sh
+   build_tools/build_xla.sh "$PWD/xla"
+   ```
+
+7. Build StableHLO as a standalone library:
 
    ```sh
    mkdir -p build && cd build
@@ -87,9 +100,10 @@ Here's how to build the StableHLO repo on Linux or macOS:
      -DCMAKE_BUILD_TYPE=Release \
      -DLLVM_ENABLE_ASSERTIONS=On \
      -DMLIR_DIR=${PWD}/../llvm-build/lib/cmake/mlir
+     -DXLA_DIR=${PWD}/../xla
    ```
 
-7. Now you can make sure it works by running some tests:
+8. Now you can make sure it works by running some tests:
 
    ```sh
    ninja check-stablehlo-tests
