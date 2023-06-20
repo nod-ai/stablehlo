@@ -44,6 +44,24 @@ def SpmdPartitioner : Pass<"stablehlo-xla-spmd-partitioner", "mlir::ModuleOp"> {
   ];
 }
 
+def CollectivesOptimization : Pass<"stablehlo-xla-collectives-optimization", "mlir::ModuleOp"> {
+  let summary = "Optimize collectives in a StableHLO program.";
+  let description = [{
+    Uses the XLO compiler. Translates first from StableHLO to XLA HLO.
+    Then runs an XLA pipeline.
+    The result is converted back to StableHLO.
+  }];
+  let constructor = "mlir::stablehlo::createCollectivesOptimizationPass()";
+  let options = [
+    Option<"reassociate_converted_all_reduce", "reassociate_converted_all_reduce",
+      "bool", /*default=*/"true", "">,
+    Option<"enable_while_loop_reduce_scatter_code_motion",
+      "enable_while_loop_reduce_scatter_code_motion", "bool", /*default=*/"false", "">,
+    Option<"enable_data_parallel_collective_optimizer",
+      "enable_data_parallel_collective_optimizer", "bool", /*default=*/"false", "">,
+  ];
+}
+
 def AutoSharding : Pass<"stablehlo-xla-auto-sharding", "mlir::ModuleOp"> {
   let summary = "Alpa auto sharding.";
   let description = [{
