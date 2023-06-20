@@ -34,6 +34,7 @@ namespace stablehlo {
 
 #define GEN_PASS_DEF_SHADINGPROPAGATION
 #define GEN_PASS_DEF_SPMDPARTITIONER
+#define GEN_PASS_DEF_COLLECTIVESOPTIMIZATION
 #define GEN_PASS_DEF_AUTOSHARDING
 #include "stablehlo/transforms/xla/XlaPasses.h.inc"
 
@@ -191,7 +192,7 @@ struct ShadingPropagationPass
     XlaShardingPropagationOption option = getOptionFromPassArgs();
     if (xla::api::runShardingPropagationPass(hloModule.value().get(),
                                              &option) != XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Sharding propagation failed.");
+      emitError(moduleOp->getLoc(), "Sharding propagation pass failed.");
       return signalPassFailure();
     }
 
@@ -250,7 +251,7 @@ struct SpmdPartitionerPass
     XlaSpmdPartitionerOption option = getOptionFromPassArgs();
     if (xla::api::runSpmdPartitionerPass(hloModule.value().get(), &option) !=
         XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Sharding propagation failed.");
+      emitError(moduleOp->getLoc(), "SPMD partitioner pass failed.");
       return signalPassFailure();
     }
 
@@ -266,6 +267,54 @@ struct SpmdPartitionerPass
     XlaSpmdPartitionerOption res;
     res.num_partitions = num_partitions;
     res.num_replicas = num_replicas;
+    return res;
+  }
+
+  std::shared_ptr<void> xlaCcLibHandle;
+};
+
+struct CollectivesOptimizationPass
+    : public impl::CollectivesOptimizationBase<CollectivesOptimizationPass> {
+  using CollectivesOptimizationBase::CollectivesOptimizationBase;
+
+  LogicalResult initialize(MLIRContext* context) override {
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    if (!xlaCcLibHandle) {
+      return LogicalResult::failure();
+    }
+    return LogicalResult::success();
+  }
+
+  void runOnOperation() override {
+    ModuleOp moduleOp = getOperation();
+
+    auto hloModule = convertToHloModule(moduleOp);
+    if (failed(hloModule)) {
+      return signalPassFailure();
+    }
+
+    XlaCollectivesOptimizationOption option = getOptionFromPassArgs();
+    if (xla::api::runCollectivesOptimizationPipeline(
+            hloModule.value().get(), &option) != XlaStatus::OK) {
+      emitError(moduleOp->getLoc(), "Collectives optimization pass failed.");
+      return signalPassFailure();
+    }
+
+    FailureOr<OwningOpRef<ModuleOp>> newModuleOpOrFailure =
+        convertFromHloModule(*hloModule.value(), getContext(),
+                             moduleOp.getLoc());
+
+    move(newModuleOpOrFailure.value().get(), moduleOp);
+  }
+
+ private:
+  XlaCollectivesOptimizationOption getOptionFromPassArgs() {
+    XlaCollectivesOptimizationOption res;
+    res.reassociate_converted_all_reduce = reassociate_converted_all_reduce;
+    res.enable_while_loop_reduce_scatter_code_motion =
+        enable_while_loop_reduce_scatter_code_motion;
+    res.enable_data_parallel_collective_optimizer =
+        enable_data_parallel_collective_optimizer;
     return res;
   }
 
@@ -301,7 +350,7 @@ struct AutoShardingPass : public impl::AutoShardingBase<AutoShardingPass> {
 
     if (xla::api::runAutoShardingPass(hloModule.value().get(), &option) !=
         XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Auto sharding failed.");
+      emitError(moduleOp->getLoc(), "Auto sharding pass failed.");
       return signalPassFailure();
     }
 
@@ -419,6 +468,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createShadingPropagationPass() {
 
 std::unique_ptr<OperationPass<ModuleOp>> createSpmdPartitionerPass() {
   return std::make_unique<SpmdPartitionerPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass() {
+  return std::make_unique<CollectivesOptimizationPass>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createAutoShardingPass() {
