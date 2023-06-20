@@ -25,6 +25,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
+#include "stablehlo/dialect/StablehloOps.h"
 #include "xla/xla_cc.h"
 #include "xla/xla_cc_loader.h"
 #include "xla/xla_cc_loader_impl.h"
