@@ -14,7 +14,6 @@ def ShadingPropagation : Pass<"stablehlo-xla-sharding-propagation", "mlir::Modul
   }];
   let constructor = "mlir::stablehlo::createShadingPropagationPass()";
   let options = [
-
     Option<"is_spmd", "is_spmd", "bool",
       /*default=*/"false", "">,
     Option<"propagate_metadata", "propagate_metadata", "bool",
@@ -26,6 +25,7 @@ def ShadingPropagation : Pass<"stablehlo-xla-sharding-propagation", "mlir::Modul
     Option<"cse_prevention_only", "cse_prevention_only", "bool",
            /*default=*/"false", "">,
   ];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
 def SpmdPartitioner : Pass<"stablehlo-xla-spmd-partitioner", "mlir::ModuleOp"> {
@@ -42,6 +42,7 @@ def SpmdPartitioner : Pass<"stablehlo-xla-spmd-partitioner", "mlir::ModuleOp"> {
     Option<"num_replicas", "num_replicas", "int64_t",
       /*default=*/"-1", "">,
   ];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
 def CollectivesOptimization : Pass<"stablehlo-xla-collectives-optimization", "mlir::ModuleOp"> {
@@ -60,6 +61,7 @@ def CollectivesOptimization : Pass<"stablehlo-xla-collectives-optimization", "ml
     Option<"enable_data_parallel_collective_optimizer",
       "enable_data_parallel_collective_optimizer", "bool", /*default=*/"false", "">,
   ];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
 def AutoSharding : Pass<"stablehlo-xla-auto-sharding", "mlir::ModuleOp"> {
@@ -127,6 +129,7 @@ def AutoSharding : Pass<"stablehlo-xla-auto-sharding", "mlir::ModuleOp"> {
       /*default=*/"3600", "">,
     ListOption<"strategy_vector", "strategy_vector", "int64_t", "">,
   ];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
 #endif // STABLEHLO_TRANSFORMS_XLA_XLAPASSES

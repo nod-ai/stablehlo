@@ -9,6 +9,7 @@ add_mlir_dialect_library(StablehloXlaPasses
   XlaPasses.cpp
 
   DEPENDS
+  StablehloOps
   StablehloXlaPassesIncGen
 
   LINK_LIBS PUBLIC
