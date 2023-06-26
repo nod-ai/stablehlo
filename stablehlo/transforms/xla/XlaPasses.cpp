@@ -35,6 +35,7 @@ namespace stablehlo {
 
 #define GEN_PASS_DEF_SHADINGPROPAGATION
 #define GEN_PASS_DEF_SPMDPARTITIONER
+#define GEN_PASS_DEF_SHADINGPROPAGATIONANDSPMDPARTITIONER
 #define GEN_PASS_DEF_COLLECTIVESOPTIMIZATION
 #define GEN_PASS_DEF_AUTOSHARDING
 #include "stablehlo/transforms/xla/XlaPasses.h.inc"
@@ -274,6 +275,90 @@ struct SpmdPartitionerPass
   std::shared_ptr<void> xlaCcLibHandle;
 };
 
+struct ShadingPropagationAndSpmdPartitionerPass
+    : public impl::ShadingPropagationAndSpmdPartitionerBase<
+          ShadingPropagationAndSpmdPartitionerPass> {
+  using ShadingPropagationAndSpmdPartitionerBase::
+      ShadingPropagationAndSpmdPartitionerBase;
+
+  LogicalResult initialize(MLIRContext* context) override {
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    if (!xlaCcLibHandle) {
+      return LogicalResult::failure();
+    }
+
+    std::transform(
+        allow_spmd_sharding_propagation_to_output.begin(),
+        allow_spmd_sharding_propagation_to_output.end(),
+        std::back_inserter(allow_spmd_sharding_propagation_to_output_vec),
+        [](char x) { return x != '0'; });
+    std::transform(
+        allow_spmd_sharding_propagation_to_parameters.begin(),
+        allow_spmd_sharding_propagation_to_parameters.end(),
+        std::back_inserter(allow_spmd_sharding_propagation_to_parameters_vec),
+        [](char x) { return x != '0'; });
+
+    return LogicalResult::success();
+  }
+
+  void runOnOperation() override {
+    ModuleOp moduleOp = getOperation();
+
+    auto hloModule = convertToHloModule(moduleOp);
+    if (failed(hloModule)) {
+      return signalPassFailure();
+    }
+
+    XlaShardingPropagationOption shardingPropagationOption =
+        getShardingPropagationOptionFromPassArgs();
+    XlaSpmdPartitionerOption spmdPartitionerOption =
+        getSpmdPartitionerOptionFromPassArgs();
+    if (xla::api::runShardingPropagationAndSpmdPartitionerPasses(
+            hloModule.value().get(), &shardingPropagationOption,
+            &spmdPartitionerOption) != XlaStatus::OK) {
+      emitError(moduleOp->getLoc(), "Sharding propagation pass failed.");
+      return signalPassFailure();
+    }
+
+    FailureOr<OwningOpRef<ModuleOp>> newModuleOpOrFailure =
+        convertFromHloModule(*hloModule.value(), getContext(),
+                             moduleOp.getLoc());
+
+    move(newModuleOpOrFailure.value().get(), moduleOp);
+  }
+
+ private:
+  XlaShardingPropagationOption getShardingPropagationOptionFromPassArgs() {
+    XlaShardingPropagationOption res;
+    res.is_spmd = is_spmd;
+    res.propagate_metadata = propagate_metadata;
+
+    res.allow_spmd_sharding_propagation_to_output = reinterpret_cast<bool*>(
+        &allow_spmd_sharding_propagation_to_output_vec[0]);
+    res.allow_spmd_sharding_propagation_to_output_size =
+        allow_spmd_sharding_propagation_to_output_vec.size();
+
+    res.allow_spmd_sharding_propagation_to_parameters = reinterpret_cast<bool*>(
+        &allow_spmd_sharding_propagation_to_parameters_vec[0]);
+    res.allow_spmd_sharding_propagation_to_parameters_size =
+        allow_spmd_sharding_propagation_to_parameters_vec.size();
+
+    res.cse_prevention_only = cse_prevention_only;
+    return res;
+  }
+
+  XlaSpmdPartitionerOption getSpmdPartitionerOptionFromPassArgs() {
+    XlaSpmdPartitionerOption res;
+    res.num_partitions = num_partitions;
+    res.num_replicas = num_replicas;
+    return res;
+  }
+
+  std::shared_ptr<void> xlaCcLibHandle;
+  std::vector<char> allow_spmd_sharding_propagation_to_output_vec;
+  std::vector<char> allow_spmd_sharding_propagation_to_parameters_vec;
+};
+
 struct CollectivesOptimizationPass
     : public impl::CollectivesOptimizationBase<CollectivesOptimizationPass> {
   using CollectivesOptimizationBase::CollectivesOptimizationBase;
@@ -469,6 +554,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createShadingPropagationPass() {
 
 std::unique_ptr<OperationPass<ModuleOp>> createSpmdPartitionerPass() {
   return std::make_unique<SpmdPartitionerPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>>
+createShadingPropagationAndSpmdPartitionerPass() {
+  return std::make_unique<ShadingPropagationAndSpmdPartitionerPass>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass() {
