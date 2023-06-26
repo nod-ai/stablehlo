@@ -45,6 +45,29 @@ def SpmdPartitioner : Pass<"stablehlo-xla-spmd-partitioner", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
+def ShadingPropagationAndSpmdPartitioner : Pass<"stablehlo-xla-sharding-propagation-and-spmd-partitioner", "mlir::ModuleOp"> {
+  let summary = "Sharding propagation and SPMD partitioner.";
+  let description = [{}];
+  let constructor = "mlir::stablehlo::createShadingPropagationAndSpmdPartitionerPass()";
+  let options = [
+    Option<"is_spmd", "is_spmd", "bool",
+      /*default=*/"false", "">,
+    Option<"propagate_metadata", "propagate_metadata", "bool",
+      /*default=*/"false", "">,
+    ListOption<"allow_spmd_sharding_propagation_to_output",
+      "allow_spmd_sharding_propagation_to_output", "char", "">,
+    ListOption<"allow_spmd_sharding_propagation_to_parameters",
+      "allow_spmd_sharding_propagation_to_parameters", "char", "">,
+    Option<"cse_prevention_only", "cse_prevention_only", "bool",
+           /*default=*/"false", "">,
+    Option<"num_partitions", "num_partitions", "int64_t",
+      /*default=*/"-1", "">,
+    Option<"num_replicas", "num_replicas", "int64_t",
+      /*default=*/"-1", "">,
+  ];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
+}
+
 def CollectivesOptimization : Pass<"stablehlo-xla-collectives-optimization", "mlir::ModuleOp"> {
   let summary = "Optimize collectives in a StableHLO program.";
   let description = [{
