@@ -20,6 +20,7 @@ add_public_tablegen_target(PassesIncGen)
 
 add_mlir_dialect_library(StablehloPasses
   PARTIAL_SOURCES_INTENDED
+  CollectivesPasses.cpp
   StablehloCanonicalizeDynamism.cpp
   StablehloLegalizeToVhlo.cpp
   StablehloRefineShapes.cpp
