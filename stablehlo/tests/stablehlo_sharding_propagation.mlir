@@ -5,8 +5,7 @@
 // RUN: | FileCheck %s
 
 //       CHECK: module @pjit_f
-//   CHECK-NOT: mhlo.num_partitions
-//   CHECK-NOT: mhlo.num_replicas
+//  CHECK-SAME: mhlo.num_partitions = 8 : i32, mhlo.num_replicas = 1 : i32
 module @pjit_f attributes {mhlo.num_partitions = 8 : i32, mhlo.num_replicas = 1 : i32} {
 //       CHECK: func.func @main
 //  CHECK-SAME: [[ARG0:%[A-Za-z0-9_]+]]: tensor<16x16xi32> {mhlo.sharding = "{devices=[1,2,4]0,2,4,6,1,3,5,7 last_tile_dim_replicate}"}
