@@ -46,20 +46,20 @@ DenseIntElementsAttr completeSubReplicaGroups(
       subReplicaGroups.getShapedType().clone(resultShape), resultArray);
 }
 
-struct CompleteAllReduceSpmdSubPartition
-    : public OpRewritePattern<AllReduceOp> {
+template <typename Op>
+struct CompleteSpmdSubPartitionPattern : public OpRewritePattern<Op> {
  public:
-  using OpRewritePattern::OpRewritePattern;
+  using OpRewritePattern<Op>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AllReduceOp op,
-                                PatternRewriter& rewriter) const final {
-    StringAttr deviceDomain = op->getAttrOfType<StringAttr>("device_domain");
+  LogicalResult matchAndRewrite(Op op, PatternRewriter& rewriter) const final {
+    StringAttr deviceDomain =
+        op->template getAttrOfType<StringAttr>("device_domain");
     if (!deviceDomain || deviceDomain.getValue() != "sub") {
       return failure();
     }
 
     DenseIntElementsAttr replicaGroupsAttr =
-        op->getAttrOfType<DenseIntElementsAttr>("replica_groups");
+        op->template getAttrOfType<DenseIntElementsAttr>("replica_groups");
     if (!replicaGroupsAttr) {
       emitError(op.getLoc(),
                 "Expected operation attribute replica_groups not found.");
@@ -76,7 +76,8 @@ struct CompleteAllReduceSpmdSubPartition
     DenseIntElementsAttr newReplicaGroupsAttr = completeSubReplicaGroups(
         replicaGroupsAttr, getCollectiveOptions().superSubDeviceMap);
     op.setReplicaGroupsAttr(newReplicaGroupsAttr);
-    op->setAttr("device_domain", StringAttr::get(getContext(), "complete"));
+    op->setAttr("device_domain",
+                StringAttr::get(this->getContext(), "complete"));
 
     return success();
   }
@@ -84,7 +85,10 @@ struct CompleteAllReduceSpmdSubPartition
 
 void populateSpmdSubPartitionCompletionRewritePatterns(
     RewritePatternSet& patterns) {
-  patterns.add<CompleteAllReduceSpmdSubPartition>(patterns.getContext());
+  patterns.add<CompleteSpmdSubPartitionPattern<AllGatherOp>,
+               CompleteSpmdSubPartitionPattern<AllReduceOp>,
+               CompleteSpmdSubPartitionPattern<ReduceScatterOp>>(
+      patterns.getContext());
 }
 
 struct CompleteCollectivesSpmdSubPartitionPass
