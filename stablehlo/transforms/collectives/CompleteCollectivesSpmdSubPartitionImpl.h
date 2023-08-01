@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "CollectivesPassesCli.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -28,16 +29,15 @@ DenseIntElementsAttr completeSubReplicaGroups(
   auto shape = subReplicaGroups.getShapedType().getShape();
   std::vector<int64_t> resultShape(shape.begin(), shape.end());
   resultShape[0] *= superSubDeviceMap.size();
-  int64_t strideDim0 = shape[1];
   SmallVector<APInt, 16> resultArray(resultShape[0] * resultShape[1]);
   int64_t i = 0;
   for (auto& superSubDeviceMapPair : superSubDeviceMap) {
-    auto& subDevices = superSubDeviceMapPair.second;
+    auto& completeDevices = superSubDeviceMapPair.second;
     std::transform(subReplicaGroups.begin(), subReplicaGroups.end(),
-                   resultArray.begin() + i * strideDim0,
-                   [&subDevices](const APInt& subDeviceIndex) {
+                   resultArray.begin() + i * shape[0] * shape[1],
+                   [&completeDevices](const APInt& subDevice) {
                      return llvm::APInt(
-                         64, subDevices[subDeviceIndex.getSExtValue()],
+                         64, completeDevices[subDevice.getSExtValue()],
                          /*isSigned=*/true);
                    });
     ++i;
