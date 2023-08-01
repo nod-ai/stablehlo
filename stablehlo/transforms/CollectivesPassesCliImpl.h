@@ -3,6 +3,7 @@
 #include <memory>
 #include <utility>
 
+#include "CollectivesPassesCli.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -11,8 +12,6 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LLVM.h"
-
-#include "CollectivesPassesCli.h"
 
 namespace mlir {
 namespace stablehlo {
@@ -29,10 +28,6 @@ struct CollectiveCliOptions {
         0: [0, 1, 2] # Map super-device 0 to sub-devices 0, 1 and 2.
         1: [3, 4, 5]
         )")};
-};
-
-struct CollectiveOptions {
-  SuperSubDeviceIdMap superSubDeviceMap;
 };
 
 }  // namespace stablehlo
@@ -119,6 +114,8 @@ void registerCollectiveCliOptions() {
   // Make sure that the options struct has been constructed.
   *collectiveCliOptions;
 }
+
+CollectiveOptions &getCollectiveOptions() { return *collectiveOptions; }
 
 }  // namespace stablehlo
 }  // namespace mlir
