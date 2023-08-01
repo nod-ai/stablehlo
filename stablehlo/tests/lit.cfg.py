@@ -31,6 +31,7 @@ if 'xla_cc_lib_path' in llvm_config.lit_config.params:
   config.substitutions.append(
       ("%xla_cc_lib_path", llvm_config.lit_config.params['xla_cc_lib_path'])
   )
+config.substitutions.append(("%test_source_root", os.path.dirname(__file__)))
 
 # Make LLVM and StableHLO tools available in RUN directives
 tools = [
