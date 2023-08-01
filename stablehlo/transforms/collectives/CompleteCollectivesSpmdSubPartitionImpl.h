@@ -53,7 +53,8 @@ struct CompleteAllReduceSpmdSubPartition
 
   LogicalResult matchAndRewrite(AllReduceOp op,
                                 PatternRewriter& rewriter) const final {
-    if (!op->hasAttr("sub_partition")) {
+    StringAttr deviceDomain = op->getAttrOfType<StringAttr>("device_domain");
+    if (!deviceDomain || deviceDomain.getValue() != "sub") {
       return failure();
     }
 
@@ -75,8 +76,7 @@ struct CompleteAllReduceSpmdSubPartition
     DenseIntElementsAttr newReplicaGroupsAttr = completeSubReplicaGroups(
         replicaGroupsAttr, getCollectiveOptions().superSubDeviceMap);
     op.setReplicaGroupsAttr(newReplicaGroupsAttr);
-    op->removeAttr("sub_partition");
-    op->setAttr("complete_partition", UnitAttr::get(getContext()));
+    op->setAttr("device_domain", StringAttr::get(getContext(), "complete"));
 
     return success();
   }

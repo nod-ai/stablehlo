@@ -27,11 +27,11 @@ def CollectivesSpmdSubPartitioner
       # The communication is described in the original device scheme.
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
+      use_global_device_ids,
       # Sharding in the new subdivided scheme.
       # The devices mean the indexes in the subdivision, not the new IDs.
       mhlo.sharding = "{devices=[1,3]0,1,2}",
-      super_partition
+      device_domain = "super"
     } : (tensor<2x9xf32>) -> tensor<2x9xf32>
     ```
 
@@ -49,8 +49,8 @@ def CollectivesSpmdSubPartitioner
       # Communication between devices described in the new scheme.
       replica_groups = dense<[[10, 13], [11, 14], [12, 15]]> : tensor<3x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      complete_partition
+      use_global_device_ids,
+      device_domain = "complete"
     } : (tensor<2x3xf32>) -> tensor<2x3xf32>
     %3 = stablehlo.custom_call @Sharding(%2) {mhlo.sharding = "{manual}"}
       : (tensor<2x3xf32>) -> tensor<2x3xf32>
@@ -65,9 +65,9 @@ def CollectivesSpmdSubPartitioner
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
+      use_global_device_ids,
       mhlo.sharding = "{devices=[3,1]0,1,2}",
-      super_partition
+      device_domain = "super"
     } : (tensor<9x2xf32>) -> tensor<9x4xf32>
     ```
 
@@ -81,8 +81,8 @@ def CollectivesSpmdSubPartitioner
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[10, 13], [11, 14], [12, 15]]> : tensor<3x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      complete_partition
+      use_global_device_ids,
+      device_domain = "complete"
     } : (tensor<3x2xf32>) -> tensor<3x4xf32>
     %3 = stablehlo.custom_call @Sharding(%2) {mhlo.sharding = "{manual}"}
       : (tensor<3x4xf32>) -> tensor<3x4xf32>
@@ -108,9 +108,9 @@ def CollectivesSpmdSubPartitioner
       scatter_dimension = 1 : i64,
       replica_groups = dense<[[0, 1], [2, 3]]> : tensor<2x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
+      use_global_device_ids,
       mhlo.sharding = "{devices=[3,1]0,1,2}",
-      super_partition
+      device_domain = "super"
     } : (tensor<9x4xf32>) -> tensor<9x2xf32>
     ```
 
@@ -124,8 +124,8 @@ def CollectivesSpmdSubPartitioner
       scatter_dimension = 1 : i64,
       replica_groups = dense<[[100, 103], [101, 104], [102, 105], [106, 109], [107, 110], [108, 111]]> : tensor<6x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      complete_partition
+      use_global_device_ids,
+      device_domain = "complete"
     } : (tensor<3x4xf32>) -> tensor<3x2xf32>
     %3 = stablehlo.custom_call @Sharding(%2) {mhlo.sharding = "{manual}"}
       : (tensor<3x2xf32>) -> tensor<3x2xf32>
@@ -153,8 +153,8 @@ def CompleteCollectivesSpmdSubPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1, 2, 3]]> : tensor<1x4xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      sub_partition
+      use_global_device_ids,
+      device_domain = "sub"
     } : (tensor<2x3xf32>) -> tensor<2x12xf32>
     ```
 
@@ -164,8 +164,8 @@ def CompleteCollectivesSpmdSubPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      super_partition
+      use_global_device_ids,
+      device_domain = "super"
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
 
@@ -175,7 +175,7 @@ def CompleteCollectivesSpmdSubPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[10, 14], [11, 15], [12, 16], [13, 17]]> : tensor<4x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true
+      use_global_device_ids
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
 
@@ -186,8 +186,8 @@ def CompleteCollectivesSpmdSubPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1], [2, 3]]> : tensor<2x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      sub_partition
+      use_global_device_ids,
+      device_domain = "sub"
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
 
@@ -197,8 +197,8 @@ def CompleteCollectivesSpmdSubPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[10, 11], [14, 15], [12, 13], [16, 17]]> : tensor<4x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      complete_partition
+      use_global_device_ids,
+      device_domain = "complete"
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
   }];
@@ -207,7 +207,7 @@ def CompleteCollectivesSpmdSubPartition
 
 def MarkUnmarkedCollectivesAsSuperPartition
   : InterfacePass<"stablehlo-mark-unmarked-collectives-as-super-partition", "mlir::FunctionOpInterface"> {
-  let summary = "Add the super_partition attribute to StableHLO collectives.";
+  let summary = "Collectives without device_domain have theirs set to \\\"super\\\".";
   let description = [{
     Example
 
@@ -217,7 +217,7 @@ def MarkUnmarkedCollectivesAsSuperPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true
+      use_global_device_ids
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
 
@@ -227,8 +227,8 @@ def MarkUnmarkedCollectivesAsSuperPartition
       all_gather_dim = 1 : i64,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-      use_global_device_ids = true,
-      super_partition
+      use_global_device_ids,
+      device_domain = "super"
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
   }];
