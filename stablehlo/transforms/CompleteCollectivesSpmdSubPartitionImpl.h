@@ -1,12 +1,16 @@
+#include <algorithm>
+
+#include "CollectivesPassesCli.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include <algorithm>
-#include "CollectivesPassesCli.h"
 
 namespace mlir {
 namespace stablehlo {
@@ -16,27 +20,30 @@ namespace stablehlo {
 
 namespace {
 
-DenseIntElementsAttr getCompleteSubReplicaGroups(const DenseIntElementsAttr& subReplicaGroups,
-  const SuperSubDeviceIdMap& superSubDeviceMap) {
+// Complete sub-partition replica groups to a complete-partition replica groups.
+DenseIntElementsAttr completeSubReplicaGroups(
+    const DenseIntElementsAttr& subReplicaGroups,
+    const SuperSubDeviceIdMap& superSubDeviceMap) {
   assert(!superSubDeviceMap.empty());
   auto shape = subReplicaGroups.getShapedType().getShape();
   std::vector<int64_t> resultShape(shape.begin(), shape.end());
-  resultShape[0] *= superSubDeviceMap.begin()->second.size();
+  resultShape[0] *= superSubDeviceMap.size();
   int64_t strideDim0 = shape[1];
-  int64_t resultStrideDim0 = resultShape[1];
-  SmallVector<int64_t, 16> resultArray(resultShape[0] * resultShape[1]);
+  SmallVector<APInt, 16> resultArray(resultShape[0] * resultShape[1]);
   int64_t i = 0;
   for (auto& superSubDeviceMapPair : superSubDeviceMap) {
-
+    auto& subDevices = superSubDeviceMapPair.second;
+    std::transform(subReplicaGroups.begin(), subReplicaGroups.end(),
+                   resultArray.begin() + i * strideDim0,
+                   [&subDevices](const APInt& subDeviceIndex) {
+                     return llvm::APInt(
+                         64, subDevices[subDeviceIndex.getSExtValue()],
+                         /*isSigned=*/true);
+                   });
     ++i;
   }
-  // for (auto subReplicaGroupsIt = subReplicaGroups.value_begin<int64_t>();
-  //   subReplicaGroupsIt != subReplicaGroups.value_end<int64_t>();
-  //   subReplicaGroupsIt += strideDim0) {
-  //   auto groupEnd = subReplicaGroupsIt + strideDim0;
-
-  //   for (groupIt = subReplicaGroupsIt
-  // }
+  return DenseIntElementsAttr::get(
+      subReplicaGroups.getShapedType().clone(resultShape), resultArray);
 }
 
 struct CompleteAllReduceSpmdSubPartition
@@ -47,47 +54,64 @@ struct CompleteAllReduceSpmdSubPartition
   LogicalResult matchAndRewrite(AllReduceOp op,
                                 PatternRewriter& rewriter) const final {
     if (!op->hasAttr("sub_partition")) {
-      return failure(); 
+      return failure();
     }
 
-    DenseIntElementsAttr replicaGroupsAttr = op->getAttrOfType<DenseIntElementsAttr>("replica_groups");
+    DenseIntElementsAttr replicaGroupsAttr =
+        op->getAttrOfType<DenseIntElementsAttr>("replica_groups");
     if (!replicaGroupsAttr) {
-      emitError(op.getLoc(), "Expected operation attribute replica_groups not found.");
+      emitError(op.getLoc(),
+                "Expected operation attribute replica_groups not found.");
       return failure();
     }
 
-    BoolAttr useGlobalDeviceIds = op->getAttrOfType<BoolAttr>("use_global_device_ids");
-    if (!useGlobalDeviceIds || !useGlobalDeviceIds.getValue()) {
-      emitError(op.getLoc(), "Expected attribute use_global_device_ids to be true.");
+    if (!op->hasAttr("use_global_device_ids")) {
+      emitError(op.getLoc(),
+                "Expected attribute use_global_device_ids. "
+                "No other modes are supported.");
       return failure();
     }
 
-    DenseIntElementsAttr newReplicaGroupsAttr = getCompleteSubReplicaGroups(replicaGroupsAttr);
+    DenseIntElementsAttr newReplicaGroupsAttr = completeSubReplicaGroups(
+        replicaGroupsAttr, getCollectiveOptions().superSubDeviceMap);
     op.setReplicaGroupsAttr(newReplicaGroupsAttr);
+    op->removeAttr("sub_partition");
+    op->setAttr("complete_partition", UnitAttr::get(getContext()));
 
     return success();
   }
 };
 
+void populateSpmdSubPartitionCompletionRewritePatterns(
+    RewritePatternSet& patterns) {
+  patterns.add<CompleteAllReduceSpmdSubPartition>(patterns.getContext());
+}
+
 struct CompleteCollectivesSpmdSubPartitionPass
     : public impl::CompleteCollectivesSpmdSubPartitionBase<
           CompleteCollectivesSpmdSubPartitionPass> {
-  // using CompleteCollectivesSpmdSubPartitionBase::
-  //     CompleteCollectivesSpmdSubPartitionBase;
+  CompleteCollectivesSpmdSubPartitionPass() { registerCollectiveCliOptions(); }
 
-  CompleteCollectivesSpmdSubPartitionPass() {
+  CompleteCollectivesSpmdSubPartitionPass(
+      const CompleteCollectivesSpmdSubPartitionPass& other)
+      : CompleteCollectivesSpmdSubPartitionBase(other) {
     registerCollectiveCliOptions();
   }
 
-  CompleteCollectivesSpmdSubPartitionPass(const CompleteCollectivesSpmdSubPartitionPass &other) : CompleteCollectivesSpmdSubPartitionBase(other) {
-    registerCollectiveCliOptions();
-  }
+  // CompleteCollectivesSpmdSubPartitionPass(const
+  // CompleteCollectivesSpmdSubPartitionOptions &options) :
+  // CompleteCollectivesSpmdSubPartitionBase(options) {
+  //   registerCollectiveCliOptions();
+  // }
 
-  CompleteCollectivesSpmdSubPartitionPass(const CompleteCollectivesSpmdSubPartitionOptions &options) : CompleteCollectivesSpmdSubPartitionBase(options) {
-    registerCollectiveCliOptions();
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    populateSpmdSubPartitionCompletionRewritePatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
-
-  void runOnOperation() override {}
 };
 
 }  // namespace
