@@ -15,8 +15,8 @@ func.func @all_reduce(%arg0: tensor<2x3xf32>) -> tensor<2x3xf32> {
 //   CHECK-DAG{LITERAL}: replica_groups = dense<[[0, 1, 2], [3, 4, 5]]>
     replica_groups = dense<[[0, 1, 2]]> : tensor<1x3xi64>,
     use_global_device_ids,
-//   CHECK-DAG: complete_partition
-    sub_partition
+//   CHECK-DAG{LITERAL}: device_domain = "complete"
+    device_domain = "sub"
   } : (tensor<2x3xf32>) -> tensor<2x3xf32>
   return %0 : tensor<2x3xf32>
 }
