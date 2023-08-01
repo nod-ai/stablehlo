@@ -12,8 +12,8 @@ func.func @all_reduce(%arg0: tensor<2x3xf32>) -> tensor<2x3xf32> {
     stablehlo.return %1 : tensor<f32>
   }) {
     channel_handle = #stablehlo.channel_handle<handle = 1, type = 1>,
-//   CHECK-DAG{LITERAL}: replica_groups = dense<[[0, 1, 2], [3, 4, 5]]>
-    replica_groups = dense<[[0, 1, 2]]> : tensor<1x3xi64>,
+//   CHECK-DAG{LITERAL}: replica_groups = dense<[[0, 1], [2, 3], [4, 5], [6, 7]]>
+    replica_groups = dense<[[0, 1], [2, 3]]> : tensor<2x2xi64>,
     use_global_device_ids,
 //   CHECK-DAG{LITERAL}: device_domain = "complete"
     device_domain = "sub"
