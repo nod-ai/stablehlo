@@ -10,13 +10,13 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/collectives/Passes.h"
 
 namespace mlir {
 namespace stablehlo {
 
 #define GEN_PASS_DEF_COMPLETECOLLECTIVESSPMDSUBPARTITION
-#include "stablehlo/transforms/Passes.h.inc"
+#include "stablehlo/transforms/collectives/Passes.h.inc"
 
 namespace {
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(collectives)
 add_subdirectory(xla)
 
 set(LLVM_TARGET_DEFINITIONS Passes.td)
@@ -20,7 +21,6 @@ add_public_tablegen_target(PassesIncGen)
 
 add_mlir_dialect_library(StablehloPasses
   PARTIAL_SOURCES_INTENDED
-  CollectivesPasses.cpp
   PassPipelines.cpp
   StablehloCanonicalizeDynamism.cpp
   StablehloLegalizeToVhlo.cpp
