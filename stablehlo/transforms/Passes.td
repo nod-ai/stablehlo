@@ -59,7 +59,8 @@ def VhloToVersionPass : Pass<"vhlo-to-version"> {
   ];
 }
 
-def CollectivesSpmdSubPartitioner : InterfacePass<"stablehlo-collectives-spmd-sub-partitioner", "mlir::FunctionOpInterface"> {
+def CollectivesSpmdSubPartitioner
+  : InterfacePass<"stablehlo-collectives-spmd-sub-partitioner", "mlir::FunctionOpInterface"> {
   let summary = "Partition only collective operations that have sharding annotations and operate on the super devices.";
   let description = [{
     Each super-pratition collective is further subdivided into a set of devices with new device IDs.
@@ -194,7 +195,8 @@ def CollectivesSpmdSubPartitioner : InterfacePass<"stablehlo-collectives-spmd-su
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
-def CompleteCollectivesSpmdSubPartition : InterfacePass<"stablehlo-complete-collectives-spmd-sub-partition", "mlir::FunctionOpInterface"> {
+def CompleteCollectivesSpmdSubPartition
+  : InterfacePass<"stablehlo-complete-collectives-spmd-sub-partition", "mlir::FunctionOpInterface"> {
   let summary = "Complete a partition of collectives that operate on a sub-partition.";
   let description = [{
     Lets have a mapping of a super-device to a sub-device.
@@ -262,7 +264,8 @@ def CompleteCollectivesSpmdSubPartition : InterfacePass<"stablehlo-complete-coll
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
-def MarkUnmarkedCollectivesAsSuperPartition : InterfacePass<"stablehlo-mark-unmarked-collectives-as-super-partition", "mlir::FunctionOpInterface"> {
+def MarkUnmarkedCollectivesAsSuperPartition
+  : InterfacePass<"stablehlo-mark-unmarked-collectives-as-super-partition", "mlir::FunctionOpInterface"> {
   let summary = "Add the super_partition attribute to StableHLO collectives.";
   let description = [{
     Example
@@ -290,45 +293,3 @@ def MarkUnmarkedCollectivesAsSuperPartition : InterfacePass<"stablehlo-mark-unma
   }];
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
-
-// def FenceOffSuperPartitionCollectives : InterfacePass<"stablehlo-mark-collectives-as-super-partition", "mlir::FunctionOpInterface"> {
-//   let summary = "Add the super_partition attribute to StableHLO collectives.";
-//   let description = [{
-//     Example
-//     Super-device to sub-device map:
-//     ```
-//     0 -> [100, 101, 102]
-//     1 -> [110, 111, 112]
-//     ``` 
-
-//     Input:
-//     ```
-//     %result = "stablehlo.all_gather"(%operand) {
-//       all_gather_dim = 1 : i64,
-//       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
-//       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-//       use_global_device_ids = true,
-//       # Sub-device sharding.
-//       mhlo.sharding = "{devices=[3,1]0,1,2}",
-//       super_partition
-//     } : (tensor<6x4xf32>) -> tensor<6x8xf32>
-//     ```
-
-//     Result:
-//     ```
-//     %1 = stablehlo.custom_call @Sharding(%0) {mhlo.sharding = "{devices=[1,2]0,1}"} : (tensor<6x4xf32>) -> tensor<6x4xf32>
-//     %2 = stablehlo.custom_call @SPMDFullToShardShape(%1) {mhlo.sharding = "{manual}"} : (tensor<6x4xf32>) -> tensor<6x4xf32>
-//     %result = "stablehlo.all_gather"(%operand) {
-//       all_gather_dim = 1 : i64,
-//       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
-//       channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
-//       use_global_device_ids = true,
-//       mhlo.sharding = "{devices=[3,1]0,1,2}",
-//       super_partition
-//     } : (tensor<6x4xf32>) -> tensor<6x8xf32>
-//     %4 = stablehlo.custom_call @Sharding(%3) {mhlo.sharding = "{manual}"} : (tensor<8x4xi32>) -> tensor<8x4xi32>
-//     %5 = stablehlo.custom_call @SPMDShardToFullShape(%4) {mhlo.sharding = "{devices=[2,4]0,1,2,3,4,5,6,7}"} : (tensor<8x4xi32>) -> tensor<16x16xi32>
-//     ```
-//   }];
-//   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
-// }
