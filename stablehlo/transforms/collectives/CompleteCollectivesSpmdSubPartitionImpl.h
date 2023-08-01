@@ -98,12 +98,6 @@ struct CompleteCollectivesSpmdSubPartitionPass
     registerCollectiveCliOptions();
   }
 
-  // CompleteCollectivesSpmdSubPartitionPass(const
-  // CompleteCollectivesSpmdSubPartitionOptions &options) :
-  // CompleteCollectivesSpmdSubPartitionBase(options) {
-  //   registerCollectiveCliOptions();
-  // }
-
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateSpmdSubPartitionCompletionRewritePatterns(patterns);
