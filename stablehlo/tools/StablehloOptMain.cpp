@@ -24,6 +24,7 @@ limitations under the License.
 #include "stablehlo/reference/InterpreterOps.h"
 #include "stablehlo/tests/TestUtils.h"
 #include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/collectives/Passes.h"
 #include "stablehlo/transforms/xla/XlaPasses.h"
 
 int main(int argc, char **argv) {
@@ -31,6 +32,7 @@ int main(int argc, char **argv) {
   mlir::hlo::registerAllTestPasses();
   mlir::stablehlo::registerPassPipelines();
   mlir::stablehlo::registerPasses();
+  mlir::stablehlo::registerStablehloCollectivesTransformsPasses();
   mlir::stablehlo::registerAllXlaPasses();
   mlir::tosa::registerStablehloLegalizeToTosaPassPass();
   mlir::tosa::registerStablehloPrepareForTosaPassPass();
