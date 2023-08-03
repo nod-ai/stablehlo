@@ -87,6 +87,7 @@ void populateSpmdSubPartitionCompletionRewritePatterns(
     RewritePatternSet& patterns) {
   patterns.add<CompleteSpmdSubPartitionPattern<AllGatherOp>,
                CompleteSpmdSubPartitionPattern<AllReduceOp>,
+               CompleteSpmdSubPartitionPattern<AllToAllOp>,
                CompleteSpmdSubPartitionPattern<ReduceScatterOp>>(
       patterns.getContext());
 }
