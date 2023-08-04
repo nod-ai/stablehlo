@@ -5,6 +5,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -83,12 +84,27 @@ struct CompleteSpmdSubPartitionPattern : public OpRewritePattern<Op> {
   }
 };
 
+struct CollectivePermuteCompleteSpmdSubPartitionPattern
+    : public OpRewritePattern<CollectivePermuteOp> {
+ public:
+  using OpRewritePattern<CollectivePermuteOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(CollectivePermuteOp op,
+                                PatternRewriter& rewriter) const final {
+    emitError(
+        op.getLoc(),
+        "Sub-partition completion for collective_permute is not implemented.");
+    return failure();
+  }
+};
+
 void populateSpmdSubPartitionCompletionRewritePatterns(
     RewritePatternSet& patterns) {
   patterns.add<CompleteSpmdSubPartitionPattern<AllGatherOp>,
                CompleteSpmdSubPartitionPattern<AllReduceOp>,
                CompleteSpmdSubPartitionPattern<AllToAllOp>,
-               CompleteSpmdSubPartitionPattern<ReduceScatterOp>>(
+               CompleteSpmdSubPartitionPattern<ReduceScatterOp>,
+               CollectivePermuteCompleteSpmdSubPartitionPattern>(
       patterns.getContext());
 }
 
