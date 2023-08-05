@@ -1,5 +1,5 @@
 // RUN: stablehlo-opt \
-// RUN:   --super-sub-device-map-file="%test_source_root/super_sub_device_map.yaml" \
+// RUN:   --super-sub-device-map-file="%test_source_root/super_sub_device_map_2x4.yaml" \
 // RUN:   --pass-pipeline="builtin.module(func.func(stablehlo-complete-collectives-spmd-sub-partition))" \
 // RUN:   --split-input-file "%s" \
 // RUN: | FileCheck "%s"

@@ -1,7 +1,9 @@
+#include "CollectivesPassesCli.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/collectives/Passes.h"
 
@@ -13,16 +15,40 @@ namespace stablehlo {
 
 namespace {
 
+struct AllGatherPattern : public OpRewritePattern<AllGatherOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AllGatherOp op,
+                                PatternRewriter& rewriter) const final {
+    return failure();
+  }
+};
+
+void populateCollectivesSpmdSubPartitionerRewritePatterns(
+    RewritePatternSet& patterns) {
+  patterns.add<AllGatherPattern>(patterns.getContext());
+}
+
 struct CollectivesSpmdSubPartitionerPass
     : public impl::CollectivesSpmdSubPartitionerBase<
           CollectivesSpmdSubPartitionerPass> {
-  using CollectivesSpmdSubPartitionerBase::CollectivesSpmdSubPartitionerBase;
+  CollectivesSpmdSubPartitionerPass() { registerCollectiveCliOptions(); }
 
-  LogicalResult initialize(MLIRContext* context) override {
-    return LogicalResult::failure();
+  CollectivesSpmdSubPartitionerPass(
+      const CollectivesSpmdSubPartitionerPass& other)
+      : CollectivesSpmdSubPartitionerBase(other) {
+    registerCollectiveCliOptions();
   }
 
-  void runOnOperation() override {}
+  void runOnOperation() override {
+    RewritePatternSet patterns(&getContext());
+    populateCollectivesSpmdSubPartitionerRewritePatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 };
 
 }  // namespace
