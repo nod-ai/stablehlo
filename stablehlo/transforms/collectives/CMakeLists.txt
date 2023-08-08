@@ -10,11 +10,14 @@ add_mlir_dialect_library(
   DEPENDS
   StablehloCollectivesPassesIncGen
 
-  LINK_LIBS PUBLIC
+  LINK_LIBS
+  PUBLIC
   MLIRFuncDialect
   MLIRIR
   MLIRSupport
   StablehloBase
   StablehloTypeInference
   StablehloOps
+  PRIVATE
+  StablehloXlaCcLibLoader
 )
