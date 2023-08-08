@@ -7,7 +7,7 @@
 namespace mlir {
 namespace stablehlo {
 
-using DeviceId = int;
+using DeviceId = int64_t;
 using SuperSubDeviceIdMap = llvm::DenseMap<DeviceId, SmallVector<DeviceId, 8>>;
 
 struct CollectiveOptions {

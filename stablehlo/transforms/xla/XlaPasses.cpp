@@ -26,9 +26,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/transforms/xla/XlaCcLibLoader.h"
 #include "xla/xla_cc.h"
-#include "xla/xla_cc_loader.h"
-#include "xla/xla_cc_loader_impl.h"
 
 namespace mlir {
 namespace stablehlo {
@@ -41,16 +40,6 @@ namespace stablehlo {
 #include "stablehlo/transforms/xla/XlaPasses.h.inc"
 
 namespace {
-
-llvm::cl::opt<std::string> xlaCcLibPath = llvm::cl::opt<std::string>(
-    "stablehlo-xla-cc-lib-path",
-    llvm::cl::desc("Path to the shared library libxla_cc_shared.so."
-                   " This path should be absolue or a filename to be searched "
-                   "in the OS runtime library search paths.\n"
-                   "On Unix-like systems the path is passed to dlopen verbatim."
-                   " You can use the environment variable LD_LIBRARY_PATH to "
-                   "add search locations."),
-    llvm::cl::init("libxla_cc_shared.so"));
 
 template <typename Fn>
 struct Destroyer {
@@ -164,7 +153,7 @@ struct ShadingPropagationPass
   using ShadingPropagationBase::ShadingPropagationBase;
 
   LogicalResult initialize(MLIRContext* context) override {
-    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath().c_str());
     if (!xlaCcLibHandle) {
       return LogicalResult::failure();
     }
@@ -235,7 +224,7 @@ struct SpmdPartitionerPass
   using SpmdPartitionerBase::SpmdPartitionerBase;
 
   LogicalResult initialize(MLIRContext* context) override {
-    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath().c_str());
     if (!xlaCcLibHandle) {
       return LogicalResult::failure();
     }
@@ -282,7 +271,7 @@ struct ShadingPropagationAndSpmdPartitionerPass
       ShadingPropagationAndSpmdPartitionerBase;
 
   LogicalResult initialize(MLIRContext* context) override {
-    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath().c_str());
     if (!xlaCcLibHandle) {
       return LogicalResult::failure();
     }
@@ -364,7 +353,7 @@ struct CollectivesOptimizationPass
   using CollectivesOptimizationBase::CollectivesOptimizationBase;
 
   LogicalResult initialize(MLIRContext* context) override {
-    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath().c_str());
     if (!xlaCcLibHandle) {
       return LogicalResult::failure();
     }
@@ -411,7 +400,7 @@ struct AutoShardingPass : public impl::AutoShardingBase<AutoShardingPass> {
   using AutoShardingBase::AutoShardingBase;
 
   LogicalResult initialize(MLIRContext* context) override {
-    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath.getValue().c_str());
+    xlaCcLibHandle = xla::api::loadLibrary(xlaCcLibPath().c_str());
     if (!xlaCcLibHandle) {
       return LogicalResult::failure();
     }
