@@ -214,6 +214,22 @@ FailureOr<AllGatherOp> createReplacementCollectiveOperation<AllGatherOp>(
   return newOp;
 }
 
+template <>
+FailureOr<AllReduceOp> createReplacementCollectiveOperation<AllReduceOp>(
+    Type resultType, Value operand, AllReduceOp originalOp,
+    const SuperSubDeviceIdMap& superSubDeviceMap) {
+  ImplicitLocOpBuilder builder(originalOp->getLoc(), originalOp.getOperation());
+  AllReduceOp newOp = builder.create<AllReduceOp>(
+      resultType, operand,
+      completeSuperReplicaGroups(originalOp.getReplicaGroups(),
+                                 superSubDeviceMap),
+      originalOp.getChannelHandleAttr(), true);
+  newOp.getRegion().takeBody(originalOp.getComputation());
+  newOp->setAttr("device_domain",
+                 StringAttr::get(originalOp->getContext(), "complete"));
+  return newOp;
+}
+
 // sub-partition -> complete-partition
 template <typename Op>
 FailureOr<Operation*> spmdPartitionCollective(
@@ -266,7 +282,8 @@ struct CollectiveOpPatternRewriter : public OpRewritePattern<Op> {
 
 void populateCollectivesSpmdSubPartitionerRewritePatterns(
     RewritePatternSet& patterns) {
-  patterns.add<CollectiveOpPatternRewriter<AllGatherOp>>(patterns.getContext());
+  patterns.add<CollectiveOpPatternRewriter<AllGatherOp>,
+               CollectiveOpPatternRewriter<AllReduceOp>>(patterns.getContext());
 }
 
 struct CollectivesSpmdSubPartitionerPass
