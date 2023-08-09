@@ -230,6 +230,38 @@ FailureOr<AllReduceOp> createReplacementCollectiveOperation<AllReduceOp>(
   return newOp;
 }
 
+template <>
+FailureOr<ReduceScatterOp>
+createReplacementCollectiveOperation<ReduceScatterOp>(
+    Type resultType, Value operand, ReduceScatterOp originalOp,
+    const SuperSubDeviceIdMap& superSubDeviceMap) {
+  if (operand.getType()
+              .cast<ShapedType>()
+              .getShape()[originalOp.getScatterDimension()] !=
+          originalOp.getOperand()
+              .getType()
+              .getShape()[originalOp.getScatterDimension()] ||
+      resultType.cast<ShapedType>()
+              .getShape()[originalOp.getScatterDimension()] !=
+          originalOp.getResult()
+              .getType()
+              .getShape()[originalOp.getScatterDimension()]) {
+    emitError(originalOp.getLoc())
+        << "Sharding along all_gather_dim is not supported.";
+    return failure();
+  }
+  ImplicitLocOpBuilder builder(originalOp->getLoc(), originalOp.getOperation());
+  ReduceScatterOp newOp = builder.create<ReduceScatterOp>(
+      resultType, operand, originalOp.getScatterDimension(),
+      completeSuperReplicaGroups(originalOp.getReplicaGroups(),
+                                 superSubDeviceMap),
+      originalOp.getChannelHandleAttr(), true);
+  newOp.getRegion().takeBody(originalOp.getComputation());
+  newOp->setAttr("device_domain",
+                 StringAttr::get(originalOp->getContext(), "complete"));
+  return newOp;
+}
+
 // sub-partition -> complete-partition
 template <typename Op>
 FailureOr<Operation*> spmdPartitionCollective(
@@ -283,7 +315,9 @@ struct CollectiveOpPatternRewriter : public OpRewritePattern<Op> {
 void populateCollectivesSpmdSubPartitionerRewritePatterns(
     RewritePatternSet& patterns) {
   patterns.add<CollectiveOpPatternRewriter<AllGatherOp>,
-               CollectiveOpPatternRewriter<AllReduceOp>>(patterns.getContext());
+               CollectiveOpPatternRewriter<AllReduceOp>,
+               CollectiveOpPatternRewriter<ReduceScatterOp>>(
+      patterns.getContext());
 }
 
 struct CollectivesSpmdSubPartitionerPass
