@@ -59,3 +59,34 @@ func.func @all_reduce(
 //              CHECK: return %[[SHARD_TO_FULL_SHAPE_RES]] : tensor<9x2xf32>
   return %0 : tensor<9x2xf32>
 }
+
+// -----
+
+//        CHECK-LABEL: func.func @reduce_scatter
+func.func @reduce_scatter(
+//              CHECK: %[[ARG0:[A-Za-z0-9]+]]: tensor<9x4xf32>
+  %arg0: tensor<9x4xf32>
+  ) -> tensor<9x2xf32> {
+//              CHECK: %[[PRE_SHARDING_RES:[A-Za-z0-9]+]] = stablehlo.custom_call @Sharding(%[[ARG0]]) {mhlo.sharding = "{devices=[3,1]0,1,2}"} : (tensor<9x4xf32>) -> tensor<9x4xf32>
+//              CHECK: %[[FULL_TO_SHARD_SHAPE_RES:[A-Za-z0-9]+]] = stablehlo.custom_call @SPMDFullToShardShape(%[[PRE_SHARDING_RES]]) {mhlo.sharding = "{manual}"} : (tensor<9x4xf32>) -> tensor<3x4xf32>
+//              CHECK: %[[REDUCE_SCATTER_RES:[A-Za-z0-9]+]] = "stablehlo.reduce_scatter"(%[[FULL_TO_SHARD_SHAPE_RES]]) ({
+  %0 = "stablehlo.reduce_scatter"(%arg0) ({
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):
+    %1 = stablehlo.add %arg1, %arg2 : tensor<f32>
+    stablehlo.return %1 : tensor<f32>
+  }) {
+    scatter_dimension = 1 : i64,
+    channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
+// CHECK-DAG{LITERAL}: replica_groups = dense<[[0, 3], [6, 9], [1, 4], [7, 10], [2, 5], [8, 11]]>
+    replica_groups = dense<[[0, 1], [2, 3]]> : tensor<2x2xi64>,
+    use_global_device_ids,
+    mhlo.sharding = "{devices=[3,1]0,1,2}",
+// CHECK-DAG{LITERAL}: device_domain = "complete"
+    device_domain = "super"
+//     CHECK{LITERAL}: } : (tensor<3x4xf32>) -> tensor<3x2xf32>
+  } : (tensor<9x4xf32>) -> tensor<9x2xf32>
+//              CHECK: %[[POST_SHARDING_RES:[A-Za-z0-9]+]] = stablehlo.custom_call @Sharding(%[[REDUCE_SCATTER_RES]]) {mhlo.sharding = "{manual}"} : (tensor<3x2xf32>) -> tensor<3x2xf32>
+//              CHECK: %[[SHARD_TO_FULL_SHAPE_RES:[A-Za-z0-9]+]] = stablehlo.custom_call @SPMDShardToFullShape(%[[POST_SHARDING_RES]]) {mhlo.sharding = "{devices=[3,1]0,1,2}"} : (tensor<3x2xf32>) -> tensor<9x2xf32>
+//              CHECK: return %[[SHARD_TO_FULL_SHAPE_RES]] : tensor<9x2xf32>
+  return %0 : tensor<9x2xf32>
+}
