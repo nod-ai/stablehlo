@@ -231,6 +231,54 @@ FailureOr<AllReduceOp> createReplacementCollectiveOperation<AllReduceOp>(
 }
 
 template <>
+FailureOr<AllToAllOp> createReplacementCollectiveOperation<AllToAllOp>(
+    Type resultType, Value operand, AllToAllOp originalOp,
+    const SuperSubDeviceIdMap& superSubDeviceMap) {
+  ImplicitLocOpBuilder builder(originalOp->getLoc(), originalOp.getOperation());
+  if (operand.getType()
+              .cast<ShapedType>()
+              .getShape()[originalOp.getSplitDimension()] !=
+          originalOp.getOperand()
+              .getType()
+              .getShape()[originalOp.getSplitDimension()] ||
+      resultType.cast<ShapedType>()
+              .getShape()[originalOp.getSplitDimension()] !=
+          originalOp.getResult()
+              .getType()
+              .getShape()[originalOp.getSplitDimension()]) {
+    emitError(originalOp.getLoc())
+        << "Sharding along split_dimension is not supported.";
+    return failure();
+  }
+  if (operand.getType()
+              .cast<ShapedType>()
+              .getShape()[originalOp.getConcatDimension()] !=
+          originalOp.getOperand()
+              .getType()
+              .getShape()[originalOp.getConcatDimension()] ||
+      resultType.cast<ShapedType>()
+              .getShape()[originalOp.getConcatDimension()] !=
+          originalOp.getResult()
+              .getType()
+              .getShape()[originalOp.getConcatDimension()]) {
+    emitError(originalOp.getLoc())
+        << "Sharding along concat_dimension is not supported.";
+    return failure();
+  }
+  AllToAllOp newOp = builder.create<AllToAllOp>(
+      resultType, operand, originalOp.getSplitDimension(),
+      originalOp.getConcatDimension(), originalOp.getSplitCount(),
+      completeSuperReplicaGroups(originalOp.getReplicaGroups(),
+                                 superSubDeviceMap),
+      originalOp.getChannelHandleAttr());
+  newOp->setAttr("use_global_device_ids",
+                 UnitAttr::get(originalOp->getContext()));
+  newOp->setAttr("device_domain",
+                 StringAttr::get(originalOp->getContext(), "complete"));
+  return newOp;
+}
+
+template <>
 FailureOr<ReduceScatterOp>
 createReplacementCollectiveOperation<ReduceScatterOp>(
     Type resultType, Value operand, ReduceScatterOp originalOp,
@@ -247,7 +295,7 @@ createReplacementCollectiveOperation<ReduceScatterOp>(
               .getType()
               .getShape()[originalOp.getScatterDimension()]) {
     emitError(originalOp.getLoc())
-        << "Sharding along all_gather_dim is not supported.";
+        << "Sharding along scatter_dimension is not supported.";
     return failure();
   }
   ImplicitLocOpBuilder builder(originalOp->getLoc(), originalOp.getOperation());
@@ -316,6 +364,7 @@ void populateCollectivesSpmdSubPartitionerRewritePatterns(
     RewritePatternSet& patterns) {
   patterns.add<CollectiveOpPatternRewriter<AllGatherOp>,
                CollectiveOpPatternRewriter<AllReduceOp>,
+               CollectiveOpPatternRewriter<AllToAllOp>,
                CollectiveOpPatternRewriter<ReduceScatterOp>>(
       patterns.getContext());
 }
