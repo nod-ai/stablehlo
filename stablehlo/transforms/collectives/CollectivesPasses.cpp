@@ -1,4 +1,5 @@
 #include "CollectivesPassesCliImpl.h"
 #include "CollectivesSpmdSubPartitionerImpl.h"
 #include "CompleteCollectivesSpmdSubPartitionImpl.h"
-#include "MarkUnmarkedCollectivesAsSuperPartition.h"
+#include "MoveDeviceDomainToFrontendAttributesImpl.h"
+#include "SetCollectivesDeviceDomainImpl.h"
