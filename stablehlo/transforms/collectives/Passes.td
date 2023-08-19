@@ -205,10 +205,12 @@ def CompleteCollectivesSpmdSubPartition
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
 
-def MarkUnmarkedCollectivesAsSuperPartition
-  : InterfacePass<"stablehlo-mark-unmarked-collectives-as-super-partition", "mlir::FunctionOpInterface"> {
-  let summary = "Collectives without device_domain have theirs set to \\\"super\\\".";
+def SetCollectivesDeviceDomain : Pass<"stablehlo-set-collectives-device-domain"> {
+  let summary = "Collectives without device_domain have theirs set.";
   let description = [{
+    Set the device_domain attribute in all collectives that don't have already a device domain
+    to what is provided in the device-domain pass option.
+
     Example
 
     Input:
@@ -229,6 +231,41 @@ def MarkUnmarkedCollectivesAsSuperPartition
       channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
       use_global_device_ids,
       device_domain = "super"
+    } : (tensor<2x3xf32>) -> tensor<2x6xf32>
+    ```
+  }];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
+  let options = [
+    Option<"deviceDomain", "device-domain", "std::string", /*default=*/"",
+      /*decription=*/"">,
+  ];
+}
+
+def MoveDeviceDomainToFrontendAttributes
+  : Pass<"stablehlo-move-device-domain-to-frontend-attributes"> {
+  let summary = "Moves the device_domain attribute inside stablehlo.frontend_attributes.";
+  let description = [{
+    Example
+
+    Input:
+    ```
+    %result = "stablehlo.all_gather"(%operand) {
+      all_gather_dim = 1 : i64,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
+      use_global_device_ids,
+      device_domain = "sub"
+    } : (tensor<2x3xf32>) -> tensor<2x6xf32>
+    ```
+
+    Result:
+    ```
+    %result = "stablehlo.all_gather"(%operand) {
+      all_gather_dim = 1 : i64,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
+      use_global_device_ids,
+      stablehlo.frontend_attributes = { device_domain = "sub" }
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
   }];
