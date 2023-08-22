@@ -23,7 +23,7 @@ namespace {
 LogicalResult moveDeviceDomainToFrontendAttributes(Operation* op) {
   StringAttr deviceDomainAttr = op->getAttrOfType<StringAttr>("device_domain");
   if (!deviceDomainAttr) {
-    return success();
+    return failure();
   }
 
   DictionaryAttr frontendAttrs =
@@ -46,7 +46,6 @@ LogicalResult moveDeviceDomainToFrontendAttributes(Operation* op) {
 
     ArrayRef<NamedAttribute> existingFrontendAttrsValue =
         frontendAttrs.getValue();
-    SmallVector<NamedAttribute, 16> frontendAttrValue;
     std::copy(existingFrontendAttrsValue.begin(),
               existingFrontendAttrsValue.end(),
               std::back_inserter(frontendAttrValue));
@@ -68,8 +67,6 @@ struct MoveDeviceDomainToFrontendAttributesRewritePattern
 
   LogicalResult matchAndRewrite(Operation* op,
                                 PatternRewriter& rewriter) const final {
-    std::cout << "Apply pattern on " << op->getName().getStringRef().str()
-              << std::endl;
     return moveDeviceDomainToFrontendAttributes(op);
   }
 };

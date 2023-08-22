@@ -236,7 +236,7 @@ def SetCollectivesDeviceDomain : Pass<"stablehlo-set-collectives-device-domain">
   }];
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
   let options = [
-    Option<"deviceDomain", "device-domain", "std::string", /*default=*/"",
+    Option<"deviceDomain", "device_domain", "std::string", /*default=*/"",
       /*decription=*/"">,
   ];
 }

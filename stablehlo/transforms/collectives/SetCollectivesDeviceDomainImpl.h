@@ -1,5 +1,6 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
@@ -7,6 +8,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/collectives/Passes.h"
 
@@ -45,10 +47,43 @@ FailureOr<llvm::SmallDenseSet<TypeID>> makeCollectivesTypeIdSet(
   return set;
 }
 
-bool isCollectiveOperation(Operation* op,
-                           llvm::SmallDenseSet<TypeID>& collectivesTypeIdSet) {
+LogicalResult setDeviceDomainIfUnset(Operation* op, StringRef deviceDomain) {
+  Attribute deviceDomainAttr = op->getAttr("device_domain");
+  if (deviceDomainAttr) {
+    return failure();
+  }
+
+  op->setAttr("device_domain", StringAttr::get(op->getContext(), deviceDomain));
+  return success();
+}
+
+bool isCollectiveOperation(
+    Operation* op, const llvm::SmallDenseSet<TypeID>& collectivesTypeIdSet) {
   return collectivesTypeIdSet.contains(op->getName().getTypeID());
 }
+
+struct SetCollectivesDeviceDomainRewritePattern : public RewritePattern {
+ public:
+  SetCollectivesDeviceDomainRewritePattern(
+      MLIRContext* context,
+      const llvm::SmallDenseSet<TypeID>& collectivesTypeIdSet,
+      StringRef deviceDomain)
+      : RewritePattern(MatchAnyOpTypeTag(), PatternBenefit(1), context),
+        collectivesTypeIdSet(collectivesTypeIdSet),
+        deviceDomain(deviceDomain) {}
+
+  LogicalResult matchAndRewrite(Operation* op,
+                                PatternRewriter& rewriter) const final {
+    if (!isCollectiveOperation(op, collectivesTypeIdSet)) {
+      return failure();
+    }
+    return setDeviceDomainIfUnset(op, deviceDomain);
+  }
+
+ private:
+  const llvm::SmallDenseSet<TypeID>& collectivesTypeIdSet;
+  StringRef deviceDomain;
+};
 
 struct SetCollectivesDeviceDomainPass
     : public impl::SetCollectivesDeviceDomainBase<
@@ -66,11 +101,13 @@ struct SetCollectivesDeviceDomainPass
   }
 
   void runOnOperation() override {
-    Operation* op = getOperation();
-    if (!isCollectiveOperation(op, collectivesTypeIdSet)) {
-      return;
+    RewritePatternSet patterns(&getContext());
+    patterns.add<SetCollectivesDeviceDomainRewritePattern>(
+        &getContext(), collectivesTypeIdSet, deviceDomain);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
-    // if (op->getAttrOfType<StringAttr>())
   }
 
  private:
