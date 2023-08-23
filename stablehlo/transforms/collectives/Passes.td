@@ -271,3 +271,34 @@ def MoveDeviceDomainToFrontendAttributes
   }];
   let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
 }
+
+def MoveDeviceDomainFromFrontendAttributes
+  : Pass<"stablehlo-move-device-domain-from-frontend-attributes"> {
+  let summary = "Moves the device_domain attribute outside stablehlo.frontend_attributes.";
+  let description = [{
+    Example
+
+    Input:
+    ```
+    %result = "stablehlo.all_gather"(%operand) {
+      all_gather_dim = 1 : i64,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
+      use_global_device_ids,
+      stablehlo.frontend_attributes = { device_domain = "sub" }
+    } : (tensor<2x3xf32>) -> tensor<2x6xf32>
+    ```
+
+    Result:
+    ```
+    %result = "stablehlo.all_gather"(%operand) {
+      all_gather_dim = 1 : i64,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
+      use_global_device_ids,
+      device_domain = "sub"
+    } : (tensor<2x3xf32>) -> tensor<2x6xf32>
+    ```
+  }];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
+}
