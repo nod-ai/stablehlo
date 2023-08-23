@@ -62,8 +62,6 @@ void completeSuperReplicaGroups(const ArrayRef<int64_t> replicaGroups,
 DenseIntElementsAttr completeSuperReplicaGroups(
     const DenseIntElementsAttr& superReplicaGroups,
     const SuperSubDeviceIdMap& superSubDeviceMap) {
-  // auto superReplicaGroupsShape =
-  // superReplicaGroups.getShapedType().getShape();
   SmallVector<int64_t, 32> superReplicaGroupsArr(superReplicaGroups.size());
   std::transform(superReplicaGroups.begin(), superReplicaGroups.end(),
                  superReplicaGroupsArr.begin(),
@@ -83,12 +81,8 @@ DenseIntElementsAttr completeSuperReplicaGroups(
 
 Operation* insertShardingProlog(ImplicitLocOpBuilder& builder, Value operand,
                                 StringAttr sharding, Type resultType) {
-  CustomCallOp shardingOp = builder.create<CustomCallOp>(
-      TypeRange(operand.getType()), ValueRange(operand));
-  shardingOp.setCallTargetName(builder.getAttr<StringAttr>("Sharding"));
-  shardingOp->setAttr("mhlo.sharding", sharding);
-  CustomCallOp spmdFullToShardShapeOp = builder.create<CustomCallOp>(
-      TypeRange(resultType), shardingOp->getResults());
+  CustomCallOp spmdFullToShardShapeOp =
+      builder.create<CustomCallOp>(TypeRange(resultType), ValueRange(operand));
   spmdFullToShardShapeOp.setCallTargetName(
       builder.getAttr<StringAttr>("SPMDFullToShardShape"));
   spmdFullToShardShapeOp->setAttr("mhlo.sharding",
@@ -98,12 +92,8 @@ Operation* insertShardingProlog(ImplicitLocOpBuilder& builder, Value operand,
 
 Operation* insertShardingEpilog(ImplicitLocOpBuilder& builder, Value operand,
                                 StringAttr sharding, Type resultType) {
-  CustomCallOp shardingOp = builder.create<CustomCallOp>(
-      TypeRange(operand.getType()), ValueRange(operand));
-  shardingOp.setCallTargetName(builder.getAttr<StringAttr>("Sharding"));
-  shardingOp->setAttr("mhlo.sharding", builder.getAttr<StringAttr>("{manual}"));
-  CustomCallOp spmdShardToFullShape = builder.create<CustomCallOp>(
-      TypeRange(resultType), shardingOp->getResults());
+  CustomCallOp spmdShardToFullShape =
+      builder.create<CustomCallOp>(TypeRange(resultType), ValueRange(operand));
   spmdShardToFullShape.setCallTargetName(
       builder.getAttr<StringAttr>("SPMDShardToFullShape"));
   spmdShardToFullShape->setAttr("mhlo.sharding", sharding);
@@ -337,6 +327,8 @@ FailureOr<Operation*> spmdPartitionCollective(
   if (failed(newOp)) {
     return failure();
   }
+  newOp.value()->setAttr("mhlo.sharding",
+                         StringAttr::get(op->getContext(), "{manual}"));
 
   FailureOr<Operation*> newResultOp = insertShardingEpilog(
       builder, newOp->getResult(),
