@@ -22,7 +22,7 @@ namespace {
 
 LogicalResult moveDeviceDomainFromFrontendAttributes(Operation* op) {
   DictionaryAttr frontendAttrs =
-      op->getAttrOfType<DictionaryAttr>("stablehlo.frontend_attributes");
+      op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
   if (!frontendAttrs) {
     return failure();
   }
@@ -36,7 +36,7 @@ LogicalResult moveDeviceDomainFromFrontendAttributes(Operation* op) {
   Attribute deviceDomainAttr = op->getAttr("device_domain");
   if (deviceDomainAttr) {
     emitError(op->getLoc()) << "Can't move device_domain attribute out of "
-                               "stablehlo.frontend_attributes."
+                               "mhlo.frontend_attributes."
                                " It is already present in. ";
     return failure();
   }
@@ -50,9 +50,13 @@ LogicalResult moveDeviceDomainFromFrontendAttributes(Operation* op) {
                [](NamedAttribute attr) {
                  return attr.getName().getValue() != "device_domain";
                });
-  op->setAttr("stablehlo.frontend_attributes",
-              DictionaryAttr::get(op->getContext(),
-                                  frontendAttrsValueWithoutDeviceDomain));
+  if (frontendAttrsValueWithoutDeviceDomain.empty()) {
+    op->removeAttr("mhlo.frontend_attributes");
+  } else {
+    op->setAttr("mhlo.frontend_attributes",
+                DictionaryAttr::get(op->getContext(),
+                                    frontendAttrsValueWithoutDeviceDomain));
+  }
 
   op->setAttr(deviceDomainAttrInFrontendAttrs->getName(),
               deviceDomainAttrInFrontendAttrs->getValue());

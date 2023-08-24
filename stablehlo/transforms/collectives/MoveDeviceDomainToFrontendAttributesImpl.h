@@ -27,7 +27,7 @@ LogicalResult moveDeviceDomainToFrontendAttributes(Operation* op) {
   }
 
   DictionaryAttr frontendAttrs =
-      op->getAttrOfType<DictionaryAttr>("stablehlo.frontend_attributes");
+      op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
   SmallVector<NamedAttribute, 16> frontendAttrValue;
   if (frontendAttrs) {
     std::optional<NamedAttribute> deviceDomainAttrInFrontendAttrs =
@@ -39,7 +39,7 @@ LogicalResult moveDeviceDomainToFrontendAttributes(Operation* op) {
           deviceDomainAttrInFrontendAttrsValue != deviceDomainAttr) {
         emitError(op->getLoc())
             << "Can't move device_domain Attributed. It is already present in "
-               "stablehlo.frontend_attributes with different value.";
+               "mhlo.frontend_attributes with different value.";
         return failure();
       }
     }
@@ -53,7 +53,7 @@ LogicalResult moveDeviceDomainToFrontendAttributes(Operation* op) {
 
   frontendAttrValue.emplace_back(
       StringAttr::get(op->getContext(), "device_domain"), deviceDomainAttr);
-  op->setAttr("stablehlo.frontend_attributes",
+  op->setAttr("mhlo.frontend_attributes",
               DictionaryAttr::get(op->getContext(), frontendAttrValue));
   op->removeAttr("device_domain");
   return success();
