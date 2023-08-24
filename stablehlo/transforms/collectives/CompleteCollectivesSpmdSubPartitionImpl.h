@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <iterator>
 
 #include "CollectivesPassesCli.h"
+#include "Utils.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -23,28 +25,51 @@ namespace stablehlo {
 namespace {
 
 // Complete sub-partition replica groups to a complete-partition replica groups.
-DenseIntElementsAttr completeSubReplicaGroups(
-    const DenseIntElementsAttr& subReplicaGroups,
-    const SuperSubDeviceIdMap& superSubDeviceMap) {
+template <typename Op>
+FailureOr<DenseIntElementsAttr> completeSubReplicaGroups(
+    Op op, const SuperSubDeviceIdMap& superSubDeviceMap) {
   assert(!superSubDeviceMap.empty());
-  auto shape = subReplicaGroups.getShapedType().getShape();
-  std::vector<int64_t> resultShape(shape.begin(), shape.end());
+  SmallVector<int64_t, 64> deviceGroups;
+  SmallVector<int64_t, 2> deviceGroupsShape;
+  ModuleOp moduleOp = op->template getParentOfType<ModuleOp>();
+  IntegerAttr numPartitionsAttr =
+      moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_partitions");
+  if (!numPartitionsAttr) {
+    emitError(moduleOp->getLoc())
+        << "mhlo.num_partitions is a required attribute.";
+    return failure();
+  }
+  auto numPartitions = numPartitionsAttr.getInt();
+  IntegerAttr numReplicasAttr =
+      moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_replicas");
+  if (!numReplicasAttr) {
+    emitError(moduleOp->getLoc())
+        << "mhlo.num_replicas is a required attribute.";
+    return failure();
+  }
+  auto numReplicas = numReplicasAttr.getInt();
+  getReplicaGroupsAsGlobalDeviceIds(op, numPartitions, numReplicas,
+                                    std::back_inserter(deviceGroups),
+                                    std::back_inserter(deviceGroupsShape));
+
+  std::vector<int64_t> resultShape(deviceGroupsShape.begin(),
+                                   deviceGroupsShape.end());
   resultShape[0] *= superSubDeviceMap.size();
   SmallVector<APInt, 16> resultArray(resultShape[0] * resultShape[1]);
   int64_t i = 0;
   for (auto& superSubDeviceMapPair : superSubDeviceMap) {
     auto& completeDevices = superSubDeviceMapPair.second;
-    std::transform(subReplicaGroups.begin(), subReplicaGroups.end(),
-                   resultArray.begin() + i * shape[0] * shape[1],
-                   [&completeDevices](const APInt& subDevice) {
-                     return llvm::APInt(
-                         64, completeDevices[subDevice.getSExtValue()],
-                         /*isSigned=*/true);
-                   });
+    std::transform(
+        deviceGroups.begin(), deviceGroups.end(),
+        resultArray.begin() + i * deviceGroupsShape[0] * deviceGroupsShape[1],
+        [&completeDevices](int64_t subDevice) {
+          return llvm::APInt(64, completeDevices[subDevice],
+                             /*isSigned=*/true);
+        });
     ++i;
   }
   return DenseIntElementsAttr::get(
-      subReplicaGroups.getShapedType().clone(resultShape), resultArray);
+      op.getReplicaGroups().getShapedType().clone(resultShape), resultArray);
 }
 
 template <typename Op>
@@ -59,24 +84,13 @@ struct CompleteSpmdSubPartitionPattern : public OpRewritePattern<Op> {
       return failure();
     }
 
-    DenseIntElementsAttr replicaGroupsAttr =
-        op->template getAttrOfType<DenseIntElementsAttr>("replica_groups");
-    if (!replicaGroupsAttr) {
-      emitError(op.getLoc(),
-                "Expected operation attribute replica_groups not found.");
+    FailureOr<DenseIntElementsAttr> newReplicaGroupsAttr =
+        completeSubReplicaGroups(op, getCollectiveOptions().superSubDeviceMap);
+    if (failed(newReplicaGroupsAttr)) {
       return failure();
     }
-
-    if (!op->hasAttr("use_global_device_ids")) {
-      emitError(op.getLoc(),
-                "Expected attribute use_global_device_ids. "
-                "No other modes are supported.");
-      return failure();
-    }
-
-    DenseIntElementsAttr newReplicaGroupsAttr = completeSubReplicaGroups(
-        replicaGroupsAttr, getCollectiveOptions().superSubDeviceMap);
-    op.setReplicaGroupsAttr(newReplicaGroupsAttr);
+    op.setReplicaGroupsAttr(newReplicaGroupsAttr.value());
+    op->setAttr("use_global_device_ids", UnitAttr::get(op->getContext()));
     op->setAttr("device_domain",
                 StringAttr::get(this->getContext(), "complete"));
 
