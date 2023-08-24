@@ -243,7 +243,7 @@ def SetCollectivesDeviceDomain : Pass<"stablehlo-set-collectives-device-domain">
 
 def MoveDeviceDomainToFrontendAttributes
   : Pass<"stablehlo-move-device-domain-to-frontend-attributes"> {
-  let summary = "Moves the device_domain attribute inside stablehlo.frontend_attributes.";
+  let summary = "Moves the device_domain attribute inside mhlo.frontend_attributes.";
   let description = [{
     Example
 
@@ -265,7 +265,7 @@ def MoveDeviceDomainToFrontendAttributes
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
       use_global_device_ids,
-      stablehlo.frontend_attributes = { device_domain = "sub" }
+      mhlo.frontend_attributes = { device_domain = "sub" }
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
   }];
@@ -274,7 +274,7 @@ def MoveDeviceDomainToFrontendAttributes
 
 def MoveDeviceDomainFromFrontendAttributes
   : Pass<"stablehlo-move-device-domain-from-frontend-attributes"> {
-  let summary = "Moves the device_domain attribute outside stablehlo.frontend_attributes.";
+  let summary = "Moves the device_domain attribute outside mhlo.frontend_attributes.";
   let description = [{
     Example
 
@@ -285,7 +285,7 @@ def MoveDeviceDomainFromFrontendAttributes
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
       channel_handle = #stablehlo.channel_handle<handle = 1, type = 0>,
       use_global_device_ids,
-      stablehlo.frontend_attributes = { device_domain = "sub" }
+      mhlo.frontend_attributes = { device_domain = "sub" }
     } : (tensor<2x3xf32>) -> tensor<2x6xf32>
     ```
 

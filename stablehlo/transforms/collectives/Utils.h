@@ -3,6 +3,10 @@
 
 #include <algorithm>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir {
@@ -23,20 +27,20 @@ inline int64_t processId(int64_t replicaId, int64_t partitionId,
 template <typename Op, typename OutputDeviceIdsIt,
           typename OutputDeviceIdsShapeIt>
 struct GetReplicaGroupsAsGlobalDeviceIds {
-  void operator()(Op op, uint64_t numPartitions,
-                  uint64_t numReplicasPerPartition,
-                  OutputDeviceIdsIt outputGlobalDeviceIdsIt,
-                  OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt);
+  LogicalResult operator()(Op op, uint64_t numPartitions,
+                           uint64_t numReplicasPerPartition,
+                           OutputDeviceIdsIt outputGlobalDeviceIdsIt,
+                           OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt);
 };
 
 template <typename Op, typename OutputDeviceIdsIt,
           typename OutputDeviceIdsShapeIt>
-void getReplicaGroupsAsGlobalDeviceIds(
+LogicalResult getReplicaGroupsAsGlobalDeviceIds(
     Op op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
     OutputDeviceIdsIt outputGlobalDeviceIdsIt,
     OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
-  GetReplicaGroupsAsGlobalDeviceIds<Op, OutputDeviceIdsIt,
-                                    OutputDeviceIdsShapeIt>()(
+  return GetReplicaGroupsAsGlobalDeviceIds<Op, OutputDeviceIdsIt,
+                                           OutputDeviceIdsShapeIt>()(
       op, numPartitions, numReplicasPerPartition, outputGlobalDeviceIdsIt,
       outputGlobalDeviceIdsShapeIt);
 }
@@ -110,10 +114,9 @@ void crossReplicaAndPartitionGroupsToGlobalDeviceIds(
 }
 
 template <typename Op, typename OutIdsIt, typename OutIdsShapeIt>
-void getReplicaGroupsAsGlobalDeviceIds1(Op op, uint64_t numPartitions,
-                                        uint64_t numReplicasPerPartition,
-                                        OutIdsIt outIdsBegin,
-                                        OutIdsShapeIt outIdsShapeBegin) {
+LogicalResult getReplicaGroupsAsGlobalDeviceIds1(
+    Op op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
+    OutIdsIt outIdsBegin, OutIdsShapeIt outIdsShapeBegin) {
   int64_t channelId = getChannelId(op.getChannelHandle());
   bool useGlobalDeviceIds = op.getUseGlobalDeviceIds();
   ArrayRef<int64_t> replicaGroupsShape =
@@ -122,16 +125,31 @@ void getReplicaGroupsAsGlobalDeviceIds1(Op op, uint64_t numPartitions,
   assert(std::distance(replicaGroupsShape.begin(), replicaGroupsShape.end()) ==
          2);
   if (channelId <= 0 && !useGlobalDeviceIds) {
+    if (replicaGroups.size() != numReplicasPerPartition) {
+      emitError(op->getLoc()) << "Mismatch between replica_groups size and "
+                                 "number of replicas per partition.";
+      return failure();
+    }
     crossReplicaGroupsToGlobalDeviceIds(
         numPartitions, numReplicasPerPartition, replicaGroups.begin(),
         replicaGroupsShape.begin(), replicaGroupsShape.end(), outIdsBegin,
         outIdsShapeBegin);
   } else if (channelId > 0 && !useGlobalDeviceIds) {
+    if (replicaGroups.size() != numReplicasPerPartition) {
+      emitError(op->getLoc()) << "Mismatch between replica_groups size and "
+                                 "number of replicas per partition.";
+      return failure();
+    }
     crossReplicaAndPartitionGroupsToGlobalDeviceIds(
         numPartitions, numReplicasPerPartition, replicaGroups.begin(),
         replicaGroupsShape.begin(), replicaGroupsShape.end(), outIdsBegin,
         outIdsShapeBegin);
   } else if (channelId > 0 && useGlobalDeviceIds) {
+    if (replicaGroups.size() != numPartitions * numReplicasPerPartition) {
+      emitError(op->getLoc()) << "Mismatch between replica_groups size and "
+                                 "number of partitions and replicas.";
+      return failure();
+    }
     std::copy(replicaGroupsShape.begin(), replicaGroupsShape.end(),
               outIdsShapeBegin);
     std::copy(replicaGroups.begin(),
@@ -139,15 +157,19 @@ void getReplicaGroupsAsGlobalDeviceIds1(Op op, uint64_t numPartitions,
                   replicaGroupsShape.begin()[0] * replicaGroupsShape.begin()[1],
               outIdsBegin);
   } else {
-    assert(false && "Not a valid case.");
+    emitError(op->getLoc())
+        << "Unsupported mode: channel_id=" << channelId
+        << " and use_global_device_ids=" << useGlobalDeviceIds << ".";
+    return failure();
   }
+
+  return success();
 }
 
 template <typename Op, typename OutIdsIt, typename OutIdsShapeIt>
-void getReplicaGroupsAsGlobalDeviceIds2(Op op, uint64_t numPartitions,
-                                        uint64_t numReplicasPerPartition,
-                                        OutIdsIt outIdsBegin,
-                                        OutIdsShapeIt outIdsShapeBegin) {
+LogicalResult getReplicaGroupsAsGlobalDeviceIds2(
+    Op op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
+    OutIdsIt outIdsBegin, OutIdsShapeIt outIdsShapeBegin) {
   int64_t channelId = getChannelId(op.getChannelHandle());
   ArrayRef<int64_t> replicaGroupsShape =
       op.getReplicaGroups().getShapedType().getShape();
@@ -155,28 +177,38 @@ void getReplicaGroupsAsGlobalDeviceIds2(Op op, uint64_t numPartitions,
   assert(std::distance(replicaGroupsShape.begin(), replicaGroupsShape.end()) ==
          2);
   if (channelId <= 0) {
+    if (replicaGroups.size() != numReplicasPerPartition) {
+      emitError(op->getLoc()) << "Mismatch between replica_groups size and "
+                                 "number of replicas per partition.";
+      return failure();
+    }
     crossReplicaGroupsToGlobalDeviceIds(
         numPartitions, numReplicasPerPartition, replicaGroups.begin(),
         replicaGroupsShape.begin(), replicaGroupsShape.end(), outIdsBegin,
         outIdsShapeBegin);
   } else if (channelId > 0) {
+    if (replicaGroups.size() != numPartitions) {
+      emitError(op->getLoc())
+          << "Mismatch between replica_groups size and number of partitions.";
+      return failure();
+    }
     crossPartitionGroupsToGlobalDeviceIds(
         numPartitions, numReplicasPerPartition, replicaGroups.begin(),
         replicaGroupsShape.begin(), replicaGroupsShape.end(), outIdsBegin,
         outIdsShapeBegin);
-  } else {
-    assert(false && "Not a valid case.");
   }
+
+  return success();
 }
 
 template <typename OutputDeviceIdsIt, typename OutputDeviceIdsShapeIt>
 struct GetReplicaGroupsAsGlobalDeviceIds<AllGatherOp, OutputDeviceIdsIt,
                                          OutputDeviceIdsShapeIt> {
-  void operator()(AllGatherOp op, uint64_t numPartitions,
-                  uint64_t numReplicasPerPartition,
-                  OutputDeviceIdsIt outputGlobalDeviceIdsIt,
-                  OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
-    getReplicaGroupsAsGlobalDeviceIds1(
+  LogicalResult operator()(
+      AllGatherOp op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
+      OutputDeviceIdsIt outputGlobalDeviceIdsIt,
+      OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
+    return getReplicaGroupsAsGlobalDeviceIds1(
         op, numPartitions, numReplicasPerPartition, outputGlobalDeviceIdsIt,
         outputGlobalDeviceIdsShapeIt);
   }
@@ -185,11 +217,11 @@ struct GetReplicaGroupsAsGlobalDeviceIds<AllGatherOp, OutputDeviceIdsIt,
 template <typename OutputDeviceIdsIt, typename OutputDeviceIdsShapeIt>
 struct GetReplicaGroupsAsGlobalDeviceIds<AllReduceOp, OutputDeviceIdsIt,
                                          OutputDeviceIdsShapeIt> {
-  void operator()(AllReduceOp op, uint64_t numPartitions,
-                  uint64_t numReplicasPerPartition,
-                  OutputDeviceIdsIt outputGlobalDeviceIdsIt,
-                  OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
-    getReplicaGroupsAsGlobalDeviceIds1(
+  LogicalResult operator()(
+      AllReduceOp op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
+      OutputDeviceIdsIt outputGlobalDeviceIdsIt,
+      OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
+    return getReplicaGroupsAsGlobalDeviceIds1(
         op, numPartitions, numReplicasPerPartition, outputGlobalDeviceIdsIt,
         outputGlobalDeviceIdsShapeIt);
   }
@@ -198,11 +230,12 @@ struct GetReplicaGroupsAsGlobalDeviceIds<AllReduceOp, OutputDeviceIdsIt,
 template <typename OutputDeviceIdsIt, typename OutputDeviceIdsShapeIt>
 struct GetReplicaGroupsAsGlobalDeviceIds<ReduceScatterOp, OutputDeviceIdsIt,
                                          OutputDeviceIdsShapeIt> {
-  void operator()(ReduceScatterOp op, uint64_t numPartitions,
-                  uint64_t numReplicasPerPartition,
-                  OutputDeviceIdsIt outputGlobalDeviceIdsIt,
-                  OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
-    getReplicaGroupsAsGlobalDeviceIds1(
+  LogicalResult operator()(
+      ReduceScatterOp op, uint64_t numPartitions,
+      uint64_t numReplicasPerPartition,
+      OutputDeviceIdsIt outputGlobalDeviceIdsIt,
+      OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
+    return getReplicaGroupsAsGlobalDeviceIds1(
         op, numPartitions, numReplicasPerPartition, outputGlobalDeviceIdsIt,
         outputGlobalDeviceIdsShapeIt);
   }
@@ -211,11 +244,11 @@ struct GetReplicaGroupsAsGlobalDeviceIds<ReduceScatterOp, OutputDeviceIdsIt,
 template <typename OutputDeviceIdsIt, typename OutputDeviceIdsShapeIt>
 struct GetReplicaGroupsAsGlobalDeviceIds<AllToAllOp, OutputDeviceIdsIt,
                                          OutputDeviceIdsShapeIt> {
-  void operator()(AllToAllOp op, uint64_t numPartitions,
-                  uint64_t numReplicasPerPartition,
-                  OutputDeviceIdsIt outputGlobalDeviceIdsIt,
-                  OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
-    getReplicaGroupsAsGlobalDeviceIds2(
+  LogicalResult operator()(
+      AllToAllOp op, uint64_t numPartitions, uint64_t numReplicasPerPartition,
+      OutputDeviceIdsIt outputGlobalDeviceIdsIt,
+      OutputDeviceIdsShapeIt outputGlobalDeviceIdsShapeIt) {
+    return getReplicaGroupsAsGlobalDeviceIds2(
         op, numPartitions, numReplicasPerPartition, outputGlobalDeviceIdsIt,
         outputGlobalDeviceIdsShapeIt);
   }

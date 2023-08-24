@@ -48,9 +48,12 @@ FailureOr<DenseIntElementsAttr> completeSubReplicaGroups(
     return failure();
   }
   auto numReplicas = numReplicasAttr.getInt();
-  getReplicaGroupsAsGlobalDeviceIds(op, numPartitions, numReplicas,
-                                    std::back_inserter(deviceGroups),
-                                    std::back_inserter(deviceGroupsShape));
+
+  if (failed(getReplicaGroupsAsGlobalDeviceIds(
+          op, numPartitions, numReplicas, std::back_inserter(deviceGroups),
+          std::back_inserter(deviceGroupsShape)))) {
+    return failure();
+  }
 
   std::vector<int64_t> resultShape(deviceGroupsShape.begin(),
                                    deviceGroupsShape.end());
