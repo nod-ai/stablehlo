@@ -200,13 +200,19 @@ struct ShadingPropagationPass
     res.is_spmd = is_spmd;
     res.propagate_metadata = propagate_metadata;
 
-    res.allow_spmd_sharding_propagation_to_output = reinterpret_cast<bool*>(
-        &allow_spmd_sharding_propagation_to_output_vec[0]);
+    res.allow_spmd_sharding_propagation_to_output =
+        allow_spmd_sharding_propagation_to_output_vec.empty()
+            ? nullptr
+            : reinterpret_cast<bool*>(
+                  &allow_spmd_sharding_propagation_to_output_vec[0]);
     res.allow_spmd_sharding_propagation_to_output_size =
         allow_spmd_sharding_propagation_to_output_vec.size();
 
-    res.allow_spmd_sharding_propagation_to_parameters = reinterpret_cast<bool*>(
-        &allow_spmd_sharding_propagation_to_parameters_vec[0]);
+    res.allow_spmd_sharding_propagation_to_parameters =
+        allow_spmd_sharding_propagation_to_parameters_vec.empty()
+            ? nullptr
+            : reinterpret_cast<bool*>(
+                  allow_spmd_sharding_propagation_to_parameters_vec.data());
     res.allow_spmd_sharding_propagation_to_parameters_size =
         allow_spmd_sharding_propagation_to_parameters_vec.size();
 
