@@ -54,3 +54,6 @@ module @main attributes {
   }
 }
 ```
+
+# Sharding Format
+See: [MHLO sharding format](../../../docs/mhlo-sharding-format.md).
