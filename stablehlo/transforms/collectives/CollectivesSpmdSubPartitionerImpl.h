@@ -2,11 +2,14 @@
 #include <utility>
 
 #include "CollectivesPassesCli.h"
+#include "Utils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -25,6 +28,50 @@ namespace stablehlo {
 #include "stablehlo/transforms/collectives/Passes.h.inc"
 
 namespace {
+
+LogicalResult moveAttributesToFrontendAttributes(ModuleOp op) {
+  DictionaryAttr frontendAttributes =
+      op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
+  if (!frontendAttributes) {
+    frontendAttributes = DictionaryAttr::get(op->getContext());
+  }
+
+  StringAttr argsShardingAttr =
+      op->getAttrOfType<StringAttr>("mhlo.spmd_parameters_shardings");
+  if (!argsShardingAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Attribute \"mhlo.spmd_parameters_shardings\" not found in module "
+           "op.";
+    return failure();
+  }
+
+  StringAttr resultsShardingAttr =
+      op->getAttrOfType<StringAttr>("mhlo.spmd_output_sharding");
+  if (!resultsShardingAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Attribute \"mhlo.spmd_output_sharding\" not found in module op.";
+    return failure();
+  }
+
+  DictionaryAttr newFrontendAttributes = setAttributes(
+      frontendAttributes,
+      {
+          NamedAttribute(
+              StringAttr::get(op->getContext(),
+                              "super_partition_spmd_parameters_sharding"),
+              argsShardingAttr),
+          NamedAttribute(
+              StringAttr::get(op->getContext(),
+                              "super_partition_spmd_output_sharding"),
+              resultsShardingAttr),
+      });
+  op->setAttr("mhlo.frontend_attributes", newFrontendAttributes);
+
+  op->removeAttr("mhlo.spmd_parameters_shardings");
+  op->removeAttr("mhlo.spmd_output_sharding");
+
+  return success();
+}
 
 SmallVector<int64_t, 2> superReplicaGroupsCompletionShape(
     const ArrayRef<int64_t> replicaGroupsShape,
@@ -381,9 +428,19 @@ struct CollectivesSpmdSubPartitionerPass
   }
 
   void runOnOperation() override {
+    if (failed(moveAttributesToFrontendAttributes(getOperation()))) {
+      return signalPassFailure();
+    }
+
+    FailureOr<func::FuncOp> mainFunc = getMainFunc(getOperation());
+    if (failed(mainFunc)) {
+      emitError(getOperation().getLoc())
+          << "Module operation does not have \"main\" function.";
+      return signalPassFailure();
+    }
     RewritePatternSet patterns(&getContext());
     populateCollectivesSpmdSubPartitionerRewritePatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+    if (failed(applyPatternsAndFoldGreedily(mainFunc->getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
