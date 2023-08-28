@@ -1,7 +1,7 @@
 include "mlir/Pass/PassBase.td"
 
 def CollectivesSpmdSubPartitioner
-  : InterfacePass<"stablehlo-collectives-spmd-sub-partitioner", "mlir::FunctionOpInterface"> {
+  : Pass<"stablehlo-collectives-spmd-sub-partitioner", "mlir::ModuleOp"> {
   let summary = "Partition only collective operations that have sharding annotations and operate on the super devices.";
   let description = [{
     Each super-pratition collective is further subdivided into a set of devices with new device IDs.
@@ -137,7 +137,7 @@ def CollectivesSpmdSubPartitioner
 }
 
 def CompleteCollectivesSpmdSubPartition
-  : InterfacePass<"stablehlo-complete-collectives-spmd-sub-partition", "mlir::FunctionOpInterface"> {
+  : Pass<"stablehlo-complete-collectives-spmd-sub-partition", "mlir::ModuleOp"> {
   let summary = "Complete a partition of collectives that operate on a sub-partition.";
   let description = [{
     Lets have a mapping of a super-device to a sub-device.
