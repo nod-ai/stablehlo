@@ -4,7 +4,7 @@
 // RUN:   --split-input-file %s \
 // RUN: | FileCheck %s
 
-// CHECK{LITERAL}: module @m attributes {mhlo.cross_program_prefetches = [], mhlo.dynamic_parameter_bindings = [], mhlo.is_dynamic = false, mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 1 : i32, mhlo.spmd_output_sharding = "{devices=[2,1]0,1}", mhlo.spmd_parameters_shardings = ["{devices=[2,1]0,1}", "{devices=[2,1]0,1}"], mhlo.use_auto_spmd_partitioning = false} {
+// CHECK{LITERAL}: module @m attributes {mhlo.cross_program_prefetches = [], mhlo.is_dynamic = false, mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 1 : i32, mhlo.spmd_output_sharding = "{devices=[2,1]0,1}", mhlo.spmd_parameters_shardings = ["{devices=[2,1]0,1}", "{devices=[2,1]0,1}"], mhlo.use_auto_spmd_partitioning = false} {
 // CHECK{LITERAL}:   func.func @main(%arg0: tensor<8x16xi32> {mhlo.sharding = "{devices=[2,1]0,1}"}, %arg1: tensor<8x16xi32> {mhlo.sharding = "{devices=[2,1]0,1}"}) -> tensor<8x16xi32> {
 // CHECK{LITERAL}:     %0 = stablehlo.add %arg0, %arg1 : tensor<8x16xi32>
 // CHECK{LITERAL}:     %1 = "stablehlo.all_reduce"(%0) ({
