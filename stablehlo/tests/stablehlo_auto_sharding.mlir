@@ -4,7 +4,7 @@
 // RUN:   --split-input-file %s \
 // RUN: | FileCheck %s
 
-// CHECK{LITERAL}: module @pjit_f attributes {mhlo.cross_program_prefetches = [], mhlo.dynamic_parameter_bindings = [], mhlo.is_dynamic = false, mhlo.use_auto_spmd_partitioning = false} {
+// CHECK{LITERAL}: module @pjit_f attributes {mhlo.cross_program_prefetches = [], mhlo.is_dynamic = false, mhlo.use_auto_spmd_partitioning = false} {
 // CHECK{LITERAL}:   func.func @main(%arg0: tensor<16x16xi32> {mhlo.sharding = "{devices=[2,1,4]0,1,2,3,4,5,6,7 last_tile_dim_replicate}"}, %arg1: tensor<16x16xi32> {mhlo.sharding = "{devices=[1,4,2]0,4,1,5,2,6,3,7 last_tile_dim_replicate}"}) -> (tensor<16x16xi32> {mhlo.sharding = "{devices=[2,4]0,1,2,3,4,5,6,7}"}) {
 // CHECK{LITERAL}:     %0 = stablehlo.dot %arg0, %arg1, precision = [DEFAULT, DEFAULT] {mhlo.sharding = "{devices=[2,4]0,1,2,3,4,5,6,7}"} : (tensor<16x16xi32>, tensor<16x16xi32>) -> tensor<16x16xi32>
 // CHECK{LITERAL}:     %1 = stablehlo.add %arg0, %0 {mhlo.sharding = "{devices=[2,4]0,1,2,3,4,5,6,7}"} : tensor<16x16xi32>
