@@ -5,7 +5,7 @@ This fork exposes some XLA passes through a C interface inside a shared library 
 You need to build it first. Then build this project by following the [build instructions](/README.md#build-instructions).
 
 The passes expose the command line argument `--stablehlo-xla-cc-lib-path` that specifies the path to `xla_cc` to be dynamically loaded.
-You can also relay on the runtime libraray search path to find the library.
+You can also relay on the runtime library search path to find the library.
 
 ## Example
 
@@ -54,6 +54,47 @@ module @main attributes {
   }
 }
 ```
+
+## Sharding Annotation
+
+The user can annotate partially the shardings of some of the tensors and then the sharding propagation pass would annotated the rest of the tensors. For explanation of the principals behind sharding propagation see the [GSPMD paper](https://arxiv.org/abs/2105.04663).
+
+### Function Arguments
+
+Function arguments are annotated thought argument attributes.
+
+```mlir
+func.func @main(%arg0: tensor<16x8xi32> {mhlo.sharding = "{devices=[1,2]0,1}"}) -> tensor<16x8xi32> {
+  ... 
+}
+```
+
+### Mid-IR
+
+Tensor values produced by other operations are annotated with the `Sharding` custom call operation.
+
+Original:
+```mlir
+func.func @main(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
+  %0 = stablehlo.add %arg0, %arg0 : tensor<1x2xf32>
+  return %0 : tensor<1x2xf32> 
+}
+```
+
+Annotated:
+```mlir
+func.func @main(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
+  %0 = stablehlo.add %arg0, %arg0 : tensor<1x2xf32>
+  %0_sharded = stablehlo.custom_call @Sharding(%0)
+    {mhlo.sharding = "{devices=[1,2]0,1}"}
+    : (tensor<1x2xf32>) -> tensor<1x2xf32>
+  return %0_sharded : tensor<1x2xf32> 
+}
+```
+
+### Function Results
+
+Results must be annotated by employing the Mid-IR annotation of the last value before the return as show in the previous section. If `allow_spmd_sharding_propagation_to_output=1` is set as a pass argument, using the function results attributes to specify the annotation will be overridden by other propagated values.
 
 # Sharding Format
 See: [MHLO sharding format](../../../docs/mhlo-sharding-format.md).
