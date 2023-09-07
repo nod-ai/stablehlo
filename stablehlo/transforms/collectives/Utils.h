@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <numeric>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -13,15 +14,137 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "xla/xla_cc.h"
+#include "xla/xla_cc_loader.h"
 
 #define MLIR_EMIT_ERROR(loc) \
   mlir::emitError(loc) << __FILE__ << ":" << __LINE__ << ": "
 
+#define FAILURE_OR_ASSIGN_OR_RETURN(name, expr)               \
+  auto FAILURE_OR_ASSIGN_OR_RETURN_FailureOr_##name = expr;   \
+  if (failed(FAILURE_OR_ASSIGN_OR_RETURN_FailureOr_##name)) { \
+    return failure();                                         \
+  }                                                           \
+  name = std::move(FAILURE_OR_ASSIGN_OR_RETURN_FailureOr_##name.value())
+
 namespace mlir {
 namespace stablehlo {
+
+using HloShardingPtr =
+    std::unique_ptr<xla::HloSharding, xla::api::DestroyHloSharding>;
+using XlaCharBuffer = std::unique_ptr<char[], xla::api::DestroyCharBuffer>;
+
+inline HloShardingPtr makeHloShardingPtr(xla::HloSharding* sharding) {
+  return HloShardingPtr(sharding, xla::api::destroyHloSharding);
+}
+
+inline FailureOr<std::string> hloShardingToStr(const xla::HloSharding& sharding,
+                                               Location loc) {
+  char* shardingStr;
+  size_t shardingStrSize;
+  if (xla::api::hloShardingToString(&sharding, &shardingStr,
+                                    &shardingStrSize) != XlaStatus::OK) {
+    MLIR_EMIT_ERROR(loc) << "Failed converting HLO sharding to string.";
+    return failure();
+  }
+  auto charBuff = XlaCharBuffer(shardingStr, xla::api::destroyCharBuffer);
+  return std::string(shardingStr, shardingStrSize);
+}
+
+inline FailureOr<StringAttr> makeHloShardingStrAttr(
+    const xla::HloSharding& sharding, Location loc) {
+  char* shardingStr;
+  size_t shardingStrSize;
+  if (xla::api::hloShardingToString(&sharding, &shardingStr,
+                                    &shardingStrSize) != XlaStatus::OK) {
+    MLIR_EMIT_ERROR(loc) << "Failed converting HLO sharding to string.";
+    return failure();
+  }
+  auto shardingStrPtr = XlaCharBuffer(shardingStr, xla::api::destroyCharBuffer);
+  return StringAttr::get(loc->getContext(),
+                         StringRef(shardingStr, shardingStrSize));
+}
+
+inline FailureOr<ArrayAttr> makeHloShardingArrayAttr(
+    const xla::HloSharding& sharding, Location loc) {
+  if (!xla::api::hloShardingIsTuple(&sharding)) {
+    MLIR_EMIT_ERROR(loc) << "Expected HLO sharding tuple.";
+    return failure();
+  }
+
+  size_t shardingElementsSize;
+  xla::api::hloShardingTupleElements(&sharding, nullptr, &shardingElementsSize);
+  llvm::SmallVector<xla::HloSharding*, 64> shardingElements(
+      shardingElementsSize);
+  xla::api::hloShardingTupleElements(
+      &sharding, const_cast<const xla::HloSharding**>(shardingElements.data()),
+      &shardingElementsSize);
+  llvm::SmallVector<Attribute, 64> shardingAttrs;
+  shardingAttrs.reserve(shardingElementsSize);
+  for (xla::HloSharding* s : shardingElements) {
+    FailureOr<StringAttr> strAttr = makeHloShardingStrAttr(*s, loc);
+    if (failed(strAttr)) {
+      return failure();
+    }
+    shardingAttrs.push_back(strAttr.value());
+  }
+  return ArrayAttr::get(loc->getContext(), shardingAttrs);
+}
+
+inline FailureOr<Attribute> makeHloShardingAttr(
+    const xla::HloSharding& sharding, Location loc, bool expandTuple = false) {
+  if (expandTuple && xla::api::hloShardingIsTuple(&sharding)) {
+    ArrayAttr arrayAttr;
+    FAILURE_OR_ASSIGN_OR_RETURN(arrayAttr,
+                                makeHloShardingArrayAttr(sharding, loc));
+    return arrayAttr;
+  }
+
+  StringAttr strAttr;
+  FAILURE_OR_ASSIGN_OR_RETURN(strAttr, makeHloShardingStrAttr(sharding, loc));
+  return strAttr;
+}
+
+inline FailureOr<HloShardingPtr> makeHloSharding(StringAttr attr,
+                                                 Location loc) {
+  xla::HloSharding* subSharding;
+  if (xla::api::parseHloSharding(attr.data(), attr.size(), &subSharding) !=
+      XlaStatus::OK) {
+    MLIR_EMIT_ERROR(loc) << "Failed parsing sharding attribute.";
+    return failure();
+  }
+  return makeHloShardingPtr(subSharding);
+}
+
+inline FailureOr<HloShardingPtr> makeHloShardingTuple(ArrayAttr attr,
+                                                      Location loc) {
+  SmallVector<HloShardingPtr, 64> hloShardings;
+  auto attrItRange = attr.getAsRange<StringAttr>();
+  hloShardings.reserve(std::distance(attrItRange.begin(), attrItRange.end()));
+  for (StringAttr strAttr : attrItRange) {
+    FailureOr<HloShardingPtr> hloSharding = makeHloSharding(strAttr, loc);
+    if (failed(hloSharding)) {
+      return failure();
+    }
+    hloShardings.emplace_back(std::move(hloSharding.value()));
+  }
+
+  SmallVector<xla::HloSharding*, 64> hloShardingsRaw(hloShardings.size());
+  std::transform(hloShardings.begin(), hloShardings.end(),
+                 hloShardingsRaw.begin(),
+                 [](const HloShardingPtr& p) { return p.get(); });
+  xla::HloSharding* resShardingRaw;
+  if (xla::api::makeHloShardingTuple(
+          const_cast<const xla::HloSharding**>(hloShardingsRaw.data()),
+          hloShardingsRaw.size(), &resShardingRaw) != XlaStatus::OK) {
+    MLIR_EMIT_ERROR(loc) << "Failed creating HLO sharding tuple.";
+  }
+  return makeHloShardingPtr(resShardingRaw);
+}
 
 inline int64_t getChannelId(const std::optional<ChannelHandleAttr>& attr) {
   if (!attr) {

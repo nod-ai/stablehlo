@@ -21,7 +21,7 @@
 // RUN:   --split-input-file %s
 
 module @spmd_pipeline attributes {
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}", "{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func public @main(

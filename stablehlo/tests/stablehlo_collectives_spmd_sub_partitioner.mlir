@@ -7,7 +7,7 @@
 
 //        CHECK-LABEL: module @all_gather
 module @all_gather attributes {
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func @main(
@@ -38,7 +38,7 @@ module @all_gather attributes {
 
 //        CHECK-LABEL: module @all_reduce
 module @all_reduce attributes {
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func @main(
@@ -72,7 +72,7 @@ module @all_reduce attributes {
 
 //        CHECK-LABEL: module @all_to_all
 module @all_to_all attributes {
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func @main(
@@ -105,7 +105,7 @@ module @all_to_all attributes {
 
 //        CHECK-LABEL: module @reduce_scatter
 module @reduce_scatter attributes {
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func @main(
@@ -140,9 +140,9 @@ module @reduce_scatter attributes {
 
 //        CHECK-LABEL: module @sharding_module_attributes
 module @sharding_module_attributes attributes {
-// CHECK-DAG{LITERAL}: mhlo.frontend_attributes = {super_partition_spmd_output_sharding = "{replicated}", super_partition_spmd_parameters_sharding = "{replicated}"}
+// CHECK-DAG{LITERAL}: mhlo.frontend_attributes = {super_partition_spmd_output_sharding = "{replicated}", super_partition_spmd_parameters_sharding = "{{replicated}}"}
 // CHECK-NOT{LITERAL}: mhlo.spmd_parameters_shardings
-  mhlo.spmd_parameters_shardings = "{replicated}",
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
 // CHECK-NOT{LITERAL}: mhlo.spmd_output_sharding
   mhlo.spmd_output_sharding = "{replicated}"
 } {
