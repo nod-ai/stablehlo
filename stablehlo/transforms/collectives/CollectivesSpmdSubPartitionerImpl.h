@@ -1,3 +1,4 @@
+#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -36,14 +37,22 @@ LogicalResult moveAttributesToFrontendAttributes(ModuleOp op) {
     frontendAttributes = DictionaryAttr::get(op->getContext());
   }
 
-  StringAttr argsShardingAttr =
-      op->getAttrOfType<StringAttr>("mhlo.spmd_parameters_shardings");
+  ArrayAttr argsShardingAttr =
+      op->getAttrOfType<ArrayAttr>("mhlo.spmd_parameters_shardings");
   if (!argsShardingAttr) {
     MLIR_EMIT_ERROR(op->getLoc())
-        << "Attribute \"mhlo.spmd_parameters_shardings\" not found in module "
+        << "Array attribute \"mhlo.spmd_parameters_shardings\" not found in "
+           "module "
            "op.";
     return failure();
   }
+  HloShardingPtr argsHloSharding = makeHloShardingPtr(nullptr);
+  FAILURE_OR_ASSIGN_OR_RETURN(
+      argsHloSharding, makeHloShardingTuple(argsShardingAttr, op.getLoc()));
+  Attribute argsShardingStrAttr;
+  FAILURE_OR_ASSIGN_OR_RETURN(
+      argsShardingStrAttr,
+      makeHloShardingAttr(*argsHloSharding.get(), op.getLoc()));
 
   StringAttr resultsShardingAttr =
       op->getAttrOfType<StringAttr>("mhlo.spmd_output_sharding");
@@ -59,7 +68,7 @@ LogicalResult moveAttributesToFrontendAttributes(ModuleOp op) {
           NamedAttribute(
               StringAttr::get(op->getContext(),
                               "super_partition_spmd_parameters_sharding"),
-              argsShardingAttr),
+              argsShardingStrAttr),
           NamedAttribute(
               StringAttr::get(op->getContext(),
                               "super_partition_spmd_output_sharding"),

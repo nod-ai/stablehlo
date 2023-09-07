@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #include "CollectivesPassesCli.h"
 #include "Utils.h"
@@ -117,12 +118,6 @@ LogicalResult canonicalTileAssignment(const xla::HloSharding& sharding,
     MLIR_EMIT_ERROR(loc) << "Sharding type unsupported.";
   }
   return success();
-}
-
-using HloShardingPtr =
-    std::unique_ptr<xla::HloSharding, xla::api::DestroyHloSharding>;
-HloShardingPtr makeHloShardingPtr(xla::HloSharding* sharding) {
-  return HloShardingPtr(sharding, xla::api::destroyHloSharding);
 }
 
 template <typename TypesIt, typename OutIt>
@@ -335,57 +330,54 @@ FailureOr<HloShardingPtr> completeSharding(
 
 template <typename AllSuperDevicesIt, typename AllSubDevicesIt,
           typename TensorRanksIt>
-FailureOr<StringAttr> completeSharding(
+FailureOr<Attribute> completeSharding(
     StringAttr superShardingAttr, AllSuperDevicesIt allSuperDevicesBegin,
-    AllSuperDevicesIt allSuperDevicesEnd, StringAttr subShardingAttr,
+    AllSuperDevicesIt allSuperDevicesEnd, Attribute subShardingAttr,
     AllSubDevicesIt allSubDevicesBegin, AllSubDevicesIt allSubDevicesEnd,
     Location loc, TensorRanksIt tensorRanksIt,
     const SuperSubDeviceIdMap& superSubDeviceMap) {
-  xla::HloSharding* superSharding;
-  if (xla::api::parseHloSharding(superShardingAttr.data(),
-                                 superShardingAttr.size(),
-                                 &superSharding) != XlaStatus::OK) {
-    MLIR_EMIT_ERROR(loc) << "Failed parsing sharding attribute.";
+  FailureOr<HloShardingPtr> superShardingPtr =
+      makeHloSharding(superShardingAttr, loc);
+  if (failed(superShardingPtr)) {
     return failure();
   }
-  HloShardingPtr superShardingPtr = makeHloShardingPtr(superSharding);
 
-  xla::HloSharding* subSharding;
-  if (xla::api::parseHloSharding(subShardingAttr.data(), subShardingAttr.size(),
-                                 &subSharding) != XlaStatus::OK) {
-    MLIR_EMIT_ERROR(loc) << "Failed parsing sharding attribute.";
-    return failure();
+  HloShardingPtr subShardingPtr = makeHloShardingPtr(nullptr);
+  if (subShardingAttr.isa<StringAttr>()) {
+    StringAttr subShardingStrAttr = subShardingAttr.cast<StringAttr>();
+    FAILURE_OR_ASSIGN_OR_RETURN(subShardingPtr,
+                                makeHloSharding(subShardingStrAttr, loc));
+  } else if (subShardingAttr.isa<ArrayAttr>()) {
+    ArrayAttr subShardingArrayAttr = subShardingAttr.cast<ArrayAttr>();
+    if (subShardingArrayAttr.size() == 1) {
+      FAILURE_OR_ASSIGN_OR_RETURN(
+          subShardingPtr,
+          makeHloSharding(
+              *subShardingArrayAttr.getAsRange<StringAttr>().begin(), loc));
+    } else {
+      FAILURE_OR_ASSIGN_OR_RETURN(
+          subShardingPtr, makeHloShardingTuple(subShardingArrayAttr, loc));
+    }
+  } else {
+    MLIR_EMIT_ERROR(loc) << "Sub-sharding attribute has unexpected type.";
   }
-  HloShardingPtr subShardingPtr = makeHloShardingPtr(subSharding);
 
-  FailureOr<HloShardingPtr> completeShardingPtr =
-      completeSharding(*superSharding, allSuperDevicesBegin, allSuperDevicesEnd,
-                       *subSharding, allSubDevicesBegin, allSubDevicesEnd, loc,
-                       tensorRanksIt, superSubDeviceMap);
+  FailureOr<HloShardingPtr> completeShardingPtr = completeSharding(
+      *superShardingPtr.value().get(), allSuperDevicesBegin, allSuperDevicesEnd,
+      *subShardingPtr.get(), allSubDevicesBegin, allSubDevicesEnd, loc,
+      tensorRanksIt, superSubDeviceMap);
   if (failed(completeShardingPtr)) {
     return failure();
   }
 
-  char* completeShardingStr;
-  size_t completeShardingStrSize;
-  if (xla::api::hloShardingToString(
-          completeShardingPtr.value().get(), &completeShardingStr,
-          &completeShardingStrSize) != XlaStatus::OK) {
-    MLIR_EMIT_ERROR(loc) << "Failed creating string from complete sharding";
-    return failure();
-  }
-  auto completeShardingStrPtr =
-      std::unique_ptr<char[], xla::api::DestroyCharBuffer>(
-          completeShardingStr, xla::api::destroyCharBuffer);
-  return StringAttr::get(
-      superShardingAttr.getContext(),
-      StringRef(completeShardingStr, completeShardingStrSize));
+  return makeHloShardingAttr(*completeShardingPtr.value().get(), loc,
+                             bool(subShardingAttr.isa<ArrayAttr>()));
 }
 
 LogicalResult completeSharding(ModuleOp op,
                                const SuperSubDeviceIdMap& superSubDeviceMap) {
-  StringAttr subPartitionArgumentsShardingAttr =
-      op->getAttrOfType<StringAttr>("mhlo.spmd_parameters_shardings");
+  ArrayAttr subPartitionArgumentsShardingAttr =
+      op->getAttrOfType<ArrayAttr>("mhlo.spmd_parameters_shardings");
   if (!subPartitionArgumentsShardingAttr) {
     MLIR_EMIT_ERROR(op->getLoc())
         << "mhlo.spmd_parameters_shardings is a required attribute.";
@@ -443,7 +435,7 @@ LogicalResult completeSharding(ModuleOp op,
                                  std::back_inserter(argumentsRank)))) {
     return failure();
   }
-  FailureOr<StringAttr> argumentsCompleteShardingAttr = completeSharding(
+  FailureOr<Attribute> argumentsCompleteShardingAttr = completeSharding(
       superPartitionArgumentsShardingAttr, superDevices.begin(),
       superDevices.end(), subPartitionArgumentsShardingAttr, subDevices.begin(),
       subDevices.end(), op->getLoc(), argumentsRank.begin(), superSubDeviceMap);
@@ -460,7 +452,7 @@ LogicalResult completeSharding(ModuleOp op,
                                std::back_inserter(resultsRank)))) {
     return failure();
   }
-  FailureOr<StringAttr> resultsCompleteShardingAttr = completeSharding(
+  FailureOr<Attribute> resultsCompleteShardingAttr = completeSharding(
       superPartitionResultsShardingAttr, superDevices.begin(),
       superDevices.end(), subPartitionResultsShardingAttr, subDevices.begin(),
       subDevices.end(), op->getLoc(), argumentsRank.begin(), superSubDeviceMap);
