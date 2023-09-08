@@ -21,6 +21,8 @@
 // RUN:   --split-input-file %s
 
 module @spmd_pipeline attributes {
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 1 : i32,
   mhlo.spmd_parameters_shardings = ["{replicated}", "{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {

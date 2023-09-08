@@ -7,6 +7,8 @@
 
 //        CHECK-LABEL: module @all_gather
 module @all_gather attributes {
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 2 : i32,
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
@@ -38,6 +40,8 @@ module @all_gather attributes {
 
 //        CHECK-LABEL: module @all_reduce
 module @all_reduce attributes {
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 2 : i32,
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
@@ -72,6 +76,8 @@ module @all_reduce attributes {
 
 //        CHECK-LABEL: module @all_to_all
 module @all_to_all attributes {
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 2 : i32,
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
@@ -105,6 +111,8 @@ module @all_to_all attributes {
 
 //        CHECK-LABEL: module @reduce_scatter
 module @reduce_scatter attributes {
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 2 : i32,
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
@@ -140,10 +148,60 @@ module @reduce_scatter attributes {
 
 //        CHECK-LABEL: module @sharding_module_attributes
 module @sharding_module_attributes attributes {
-// CHECK-DAG{LITERAL}: mhlo.frontend_attributes = {super_partition_spmd_output_sharding = "{replicated}", super_partition_spmd_parameters_sharding = "{{replicated}}"}
+  mhlo.num_partitions = 2 : i32,
+  mhlo.num_replicas = 2 : i32,
+//     CHECK{LITERAL}: mhlo.frontend_attributes = {
+//     CHECK{LITERAL}: super_partition_spmd_output_sharding = "{replicated}"
+//     CHECK{LITERAL}: super_partition_spmd_parameters_sharding = "{{replicated}}"
 // CHECK-NOT{LITERAL}: mhlo.spmd_parameters_shardings
   mhlo.spmd_parameters_shardings = ["{replicated}"],
 // CHECK-NOT{LITERAL}: mhlo.spmd_output_sharding
+  mhlo.spmd_output_sharding = "{replicated}"
+} {
+  func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+    return %arg0 : tensor<1xf32>
+  }
+}
+
+// -----
+
+//        CHECK-LABEL: module @num_partitions_and_replicas_attributes
+module @num_partitions_and_replicas_attributes attributes {
+//     CHECK{LITERAL}: mhlo.frontend_attributes
+  mhlo.frontend_attributes = {
+// CHECK-NOT{LITERAL}: sub_partition_num_partitions
+    sub_partition_num_partitions = "3",
+// CHECK-NOT{LITERAL}: sub_partition_num_replicas
+    sub_partition_num_replicas = "1"
+//     CHECK{LITERAL}: super_partition_num_partitions = "1"
+//     CHECK{LITERAL}: super_partition_num_replicas = "4"
+  },
+//     CHECK{LITERAL}: mhlo.num_partitions = 3 : i32
+  mhlo.num_partitions = 1 : i32,
+//     CHECK{LITERAL}: mhlo.num_replicas = 1 : i32
+  mhlo.num_replicas = 4 : i32,
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
+  mhlo.spmd_output_sharding = "{replicated}"
+} {
+  func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+    return %arg0 : tensor<1xf32>
+  }
+}
+
+// -----
+
+//        CHECK-LABEL: module @sub_partition_num_partitions_and_replicas_from_super_sub_device_map
+module @sub_partition_num_partitions_and_replicas_from_super_sub_device_map attributes {
+//     CHECK{LITERAL}: mhlo.frontend_attributes
+  mhlo.frontend_attributes = {
+//     CHECK{LITERAL}: super_partition_num_partitions = "1"
+//     CHECK{LITERAL}: super_partition_num_replicas = "4"
+  },
+//     CHECK{LITERAL}: mhlo.num_partitions = 1 : i32
+  mhlo.num_partitions = 1 : i32,
+//     CHECK{LITERAL}: mhlo.num_replicas = 3 : i32
+  mhlo.num_replicas = 4 : i32,
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}"
 } {
   func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {

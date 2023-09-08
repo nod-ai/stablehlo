@@ -12,6 +12,8 @@ module @all_gather attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -39,6 +41,8 @@ module @all_reduce attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -69,6 +73,8 @@ module @all_to_all attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -98,6 +104,8 @@ module @reduce_scatter attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -129,6 +137,8 @@ module @cross_replica attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -156,6 +166,8 @@ module @cross_replica_and_partition attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -183,6 +195,8 @@ module @cross_partition attributes {
   mhlo.spmd_parameters_shardings = ["{replicated}"],
   mhlo.spmd_output_sharding = "{replicated}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{replicated}}",
     super_partition_spmd_output_sharding = "{replicated}"
   }
@@ -214,6 +228,8 @@ module @module_sharding_replicated attributes {
   mhlo.spmd_output_sharding = "{devices=[1,1,4]0,1,2,3 last_tile_dim_replicate}",
 // CHECK-NOT{LITERAL}: mhlo.frontend_attributes
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
 // CHECK-NOT{LITERAL}: super_partition_spmd_parameters_sharding
     super_partition_spmd_parameters_sharding = "{{replicated}}",
 // CHECK-NOT{LITERAL}: super_partition_spmd_parameters_sharding
@@ -236,6 +252,8 @@ module @module_sharding_tiled attributes {
 // CHECK-DAG{LITERAL}: mhlo.spmd_output_sharding = "{devices=[1,8]4,5,6,7,0,1,2,3}"
   mhlo.spmd_output_sharding = "{devices=[1,4]0,1,2,3}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{devices=[1,2]0,1}}",
     super_partition_spmd_output_sharding = "{devices=[1,2]1,0}"
   }
@@ -256,6 +274,8 @@ module @module_sharding_partial_replication attributes {
 // CHECK-DAG{LITERAL}: mhlo.spmd_output_sharding = "{devices=[1,2,4]0,1,4,5,2,3,6,7 last_tile_dim_replicate}"
   mhlo.spmd_output_sharding = "{devices=[1,2,2]0,1,2,3 last_tile_dim_replicate}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{devices=[1,2]0,1}}",
     super_partition_spmd_output_sharding = "{devices=[1,1,2]0,1 last_tile_dim_replicate}"
   }
@@ -276,11 +296,37 @@ module @module_sharding_tuple attributes {
 // CHECK-DAG{LITERAL}: mhlo.spmd_parameters_shardings = ["{devices=[1,2,4]0,1,2,3,4,5,6,7 last_tile_dim_replicate}", "{devices=[1,2,4]4,5,6,7,0,1,2,3 last_tile_dim_replicate}"]
   mhlo.spmd_output_sharding = "{{replicated}, {replicated}}",
   mhlo.frontend_attributes = {
+    super_partition_num_partitions = "1",
+    super_partition_num_replicas = "2",
     super_partition_spmd_parameters_sharding = "{{devices=[1,2]0,1}, {devices=[1,2]1,0}}",
     super_partition_spmd_output_sharding = "{{devices=[2,1]0,1}, {devices=[2,1]1,0}}"
   }
 } {
   func.func @main(%arg0: tensor<1x2xf32>, %arg1: tensor<3x4xf32>) -> (tensor<1x2xf32>, tensor<3x4xf32>) {
     return %arg0, %arg1 : tensor<1x2xf32>, tensor<3x4xf32>
+  }
+}
+
+// -----
+
+//        CHECK-LABEL: module @module_num_partitions_and_replicas
+module @module_num_partitions_and_replicas attributes {
+  mhlo.frontend_attributes = {
+// CHECK-NOT{LITERAL}: super_partition_num_partitions
+    super_partition_num_partitions = "1",
+// CHECK-NOT{LITERAL}: super_partition_num_replicas
+    super_partition_num_replicas = "2",
+    super_partition_spmd_parameters_sharding = "{{replicated}}",
+    super_partition_spmd_output_sharding = "{replicated}"
+  },
+//     CHECK{LITERAL}: mhlo.num_partitions = 2 : i32
+  mhlo.num_partitions = 2 : i32,
+//     CHECK{LITERAL}: mhlo.num_replicas = 4 : i32
+  mhlo.num_replicas = 2 : i32,
+  mhlo.spmd_parameters_shardings = ["{replicated}"],
+  mhlo.spmd_output_sharding = "{replicated}"
+} {
+  func.func @main(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
+    return %arg0 : tensor<1x2xf32>
   }
 }

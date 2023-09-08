@@ -33,6 +33,83 @@ namespace stablehlo {
 
 namespace {
 
+LogicalResult handleNumPartitionsAndReplicasAttributes(ModuleOp op) {
+  Builder builder(op->getContext());
+
+  DictionaryAttr frontendAttributes =
+      op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
+  if (!frontendAttributes) {
+    frontendAttributes = DictionaryAttr::get(op->getContext());
+  }
+
+  Attribute superPartitionNumPartitionsAttr =
+      frontendAttributes.get("super_partition_num_partitions");
+  if (!superPartitionNumPartitionsAttr) {
+    MLIR_EMIT_ERROR(op.getLoc()) << "Attribute super_partition_num_partitions "
+                                    "not found in mhlo.frontend_attributes.";
+    return failure();
+  }
+  int32_t superPartitionNumPartitions;
+  FAILURE_OR_ASSIGN_OR_RETURN(
+      superPartitionNumPartitions,
+      toInteger<int32_t>(
+          superPartitionNumPartitionsAttr.cast<StringAttr>().strref(),
+          op->getLoc()));
+
+  Attribute superPartitionNumReplicasAttr =
+      frontendAttributes.get("super_partition_num_replicas");
+  if (!superPartitionNumReplicasAttr) {
+    MLIR_EMIT_ERROR(op.getLoc()) << "Attribute super_partition_num_replicas "
+                                    "not found in mhlo.frontend_attributes.";
+    return failure();
+  }
+  int32_t superPartitionNumReplicas;
+  FAILURE_OR_ASSIGN_OR_RETURN(
+      superPartitionNumReplicas,
+      toInteger<int32_t>(
+          superPartitionNumReplicasAttr.cast<StringAttr>().strref(),
+          op->getLoc()));
+
+  IntegerAttr subPartitionNumPartitionsAttr =
+      op->getAttrOfType<IntegerAttr>("mhlo.num_partitions");
+  if (!subPartitionNumPartitionsAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Required integer attribute mhlo.num_partitions not found.";
+  }
+  int32_t subPartitionNumPartitions =
+      subPartitionNumPartitionsAttr.getValue().getSExtValue();
+
+  IntegerAttr subPartitionNumReplicasAttr =
+      op->getAttrOfType<IntegerAttr>("mhlo.num_replicas");
+  if (!subPartitionNumReplicasAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Required integer attribute mhlo.num_replicas not found.";
+  }
+  int32_t subPartitionNumReplicas =
+      subPartitionNumReplicasAttr.getValue().getSExtValue();
+
+  int32_t completePartitionNumPartitions =
+      superPartitionNumPartitions * subPartitionNumPartitions;
+  op->setAttr("mhlo.num_partitions",
+              builder.getI32IntegerAttr(completePartitionNumPartitions));
+
+  int32_t completePartitionNumReplicas =
+      superPartitionNumReplicas * subPartitionNumReplicas;
+  op->setAttr("mhlo.num_replicas",
+              builder.getI32IntegerAttr(completePartitionNumReplicas));
+
+  frontendAttributes = removeAttributes(
+      frontendAttributes,
+      {"super_partition_num_partitions", "super_partition_num_replicas"});
+  if (frontendAttributes.empty()) {
+    op->removeAttr("mhlo.frontend_attributes");
+  } else {
+    op->setAttr("mhlo.frontend_attributes", frontendAttributes);
+  }
+
+  return success();
+}
+
 template <typename ShapeIt>
 auto shapeElementsCount(ShapeIt begin, ShapeIt end) {
   return std::reduce(begin, end, 1, std::multiplies<>{});
@@ -601,6 +678,10 @@ struct CompleteCollectivesSpmdSubPartitionPass
     populateSpmdSubPartitionCompletionRewritePatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(mainFunc.value(),
                                             std::move(patterns)))) {
+      return signalPassFailure();
+    }
+
+    if (failed(handleNumPartitionsAndReplicasAttributes(getOperation()))) {
       return signalPassFailure();
     }
   }

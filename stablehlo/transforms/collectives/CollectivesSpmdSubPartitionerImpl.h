@@ -1,5 +1,7 @@
+#include <cstddef>
 #include <iterator>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "CollectivesPassesCli.h"
@@ -30,7 +32,87 @@ namespace stablehlo {
 
 namespace {
 
-LogicalResult moveAttributesToFrontendAttributes(ModuleOp op) {
+LogicalResult handleNumPartitionsAndReplicasAttributes(
+    ModuleOp op, const SuperSubDeviceIdMap& superSubDeviceMap) {
+  Builder builder(op->getContext());
+
+  DictionaryAttr frontendAttributes =
+      op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
+  if (!frontendAttributes) {
+    frontendAttributes = DictionaryAttr::get(op->getContext());
+  }
+
+  Attribute subPartitionNumPartitionsAttr =
+      frontendAttributes.get("sub_partition_num_partitions");
+  Attribute subPartitionNumReplicasAttr =
+      frontendAttributes.get("sub_partition_num_replicas");
+  if (bool(subPartitionNumPartitionsAttr) !=
+      bool(subPartitionNumReplicasAttr)) {
+    MLIR_EMIT_ERROR(op.getLoc())
+        << "sub_partition_num_partitions and sub_partition_num_replicas "
+           "must both be present or not at the same time in "
+           "mhlo.frontend_attributes";
+    return failure();
+  }
+  int32_t subPartitionNumPartitions;
+  int32_t subPartitionNumReplicas;
+  if (subPartitionNumPartitionsAttr) {
+    FAILURE_OR_ASSIGN_OR_RETURN(
+        subPartitionNumPartitions,
+        toInteger<int32_t>(
+            subPartitionNumPartitionsAttr.cast<StringAttr>().strref(),
+            op->getLoc()));
+    FAILURE_OR_ASSIGN_OR_RETURN(
+        subPartitionNumReplicas,
+        toInteger<int32_t>(
+            subPartitionNumReplicasAttr.cast<StringAttr>().strref(),
+            op->getLoc()));
+  } else {
+    subPartitionNumPartitions = 1;
+    assert(!superSubDeviceMap.empty());
+    subPartitionNumReplicas = superSubDeviceMap.begin()->second.size();
+  }
+
+  IntegerAttr superPartitionNumPartitionsAttr =
+      op->getAttrOfType<IntegerAttr>("mhlo.num_partitions");
+  if (!superPartitionNumPartitionsAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Required integer attribute mhlo.num_partitions not found.";
+  }
+  int32_t superPartitionNumPartitions =
+      superPartitionNumPartitionsAttr.getValue().getSExtValue();
+
+  IntegerAttr superPartitionNumReplicasAttr =
+      op->getAttrOfType<IntegerAttr>("mhlo.num_replicas");
+  if (!superPartitionNumReplicasAttr) {
+    MLIR_EMIT_ERROR(op->getLoc())
+        << "Required integer attribute mhlo.num_replicas not found.";
+  }
+  int32_t superPartitionNumReplicas =
+      superPartitionNumReplicasAttr.getValue().getSExtValue();
+
+  frontendAttributes = setAttributes(
+      frontendAttributes,
+      {NamedAttribute(
+           builder.getStringAttr("super_partition_num_partitions"),
+           builder.getStringAttr(std::to_string(superPartitionNumPartitions))),
+       NamedAttribute(
+           builder.getStringAttr("super_partition_num_replicas"),
+           builder.getStringAttr(std::to_string(superPartitionNumReplicas)))});
+
+  frontendAttributes = removeAttributes(
+      frontendAttributes,
+      {"sub_partition_num_partitions", "sub_partition_num_replicas"});
+
+  op->setAttr("mhlo.frontend_attributes", frontendAttributes);
+  op->setAttr("mhlo.num_partitions",
+              builder.getI32IntegerAttr(subPartitionNumPartitions));
+  op->setAttr("mhlo.num_replicas",
+              builder.getI32IntegerAttr(subPartitionNumReplicas));
+  return success();
+}
+
+LogicalResult handleModuleIoShardingAttributes(ModuleOp op) {
   DictionaryAttr frontendAttributes =
       op->getAttrOfType<DictionaryAttr>("mhlo.frontend_attributes");
   if (!frontendAttributes) {
@@ -437,7 +519,11 @@ struct CollectivesSpmdSubPartitionerPass
   }
 
   void runOnOperation() override {
-    if (failed(moveAttributesToFrontendAttributes(getOperation()))) {
+    if (failed(handleModuleIoShardingAttributes(getOperation()))) {
+      return signalPassFailure();
+    }
+    if (failed(handleNumPartitionsAndReplicasAttributes(
+            getOperation(), getCollectiveOptions().superSubDeviceMap))) {
       return signalPassFailure();
     }
 

@@ -2,6 +2,7 @@
 #define STABLEHLO_TRANSFORMS_COLLECTIVES_UTILS_H
 
 #include <algorithm>
+#include <charconv>
 #include <initializer_list>
 #include <iterator>
 #include <map>
@@ -37,6 +38,17 @@ namespace stablehlo {
 using HloShardingPtr =
     std::unique_ptr<xla::HloSharding, xla::api::DestroyHloSharding>;
 using XlaCharBuffer = std::unique_ptr<char[], xla::api::DestroyCharBuffer>;
+
+template <typename Int>
+inline FailureOr<Int> toInteger(StringRef s, Location loc) {
+  Int res;
+  std::from_chars_result ret =
+      std::from_chars(s.data(), s.data() + s.size(), res);
+  if (ret.ec != std::errc()) {
+    MLIR_EMIT_ERROR(loc) << "Failed converting \"" << s << "\" to integer.";
+  }
+  return res;
+}
 
 inline HloShardingPtr makeHloShardingPtr(xla::HloSharding* sharding) {
   return HloShardingPtr(sharding, xla::api::destroyHloSharding);
