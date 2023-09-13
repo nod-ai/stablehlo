@@ -48,7 +48,7 @@ Here's how to build the StableHLO repo on Linux or macOS:
 3. Clone the StableHLO repo and the LLVM repository:
 
    ```sh
-   git clone https://github.com/openxla/stablehlo
+   git clone --branch distributed https://github.com/nod-ai/stablehlo.git
    ```
 
    ```sh
