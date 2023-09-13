@@ -255,6 +255,9 @@ struct SpmdPartitionerPass
     FailureOr<OwningOpRef<ModuleOp>> newModuleOpOrFailure =
         convertFromHloModule(*hloModule.value(), getContext(),
                              moduleOp.getLoc());
+    if (failed(newModuleOpOrFailure)) {
+      return signalPassFailure();
+    }
 
     move(newModuleOpOrFailure.value().get(), moduleOp);
   }
