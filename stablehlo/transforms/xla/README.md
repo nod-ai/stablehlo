@@ -2,7 +2,8 @@
 
 The MLIR passes here use passes from a [fork](https://github.com/nod-ai/xla/tree/xla_cc) of the XLA compiler.
 This fork exposes some XLA passes through a C interface inside a shared library `xla_cc`.
-You need to build it first. Then build this project by following the [build instructions](/README.md#build-instructions).
+You need to build it first. Then build this project.
+You can follow these [build instructions](/README.md#build-instructions).
 
 The passes expose the command line argument `--stablehlo-xla-cc-lib-path` that specifies the path to `xla_cc` to be dynamically loaded.
 You can also relay on the runtime library search path to find the library.
