@@ -39,6 +39,9 @@ namespace stablehlo {
 #define GEN_PASS_DEF_AUTOSHARDING
 #include "stablehlo/transforms/xla/XlaPasses.h.inc"
 
+#define MLIR_EMIT_ERROR(loc) \
+  mlir::emitError(loc) << __FILE__ << ":" << __LINE__ << ": "
+
 namespace {
 
 template <typename Fn>
@@ -76,7 +79,8 @@ convertToHloModule(ModuleOp moduleOp) {
   std::string rawBytecodeBuffer;
   llvm::raw_string_ostream os(rawBytecodeBuffer);
   if (failed(writeBytecodeToFile(moduleOp.getOperation(), os))) {
-    emitError(moduleOp->getLoc(), "Failed serializing MLIR to bytecode.");
+    MLIR_EMIT_ERROR(moduleOp->getLoc())
+        << "Failed serializing MLIR to bytecode.";
     return failure();
   }
 
@@ -84,8 +88,8 @@ convertToHloModule(ModuleOp moduleOp) {
   if (xla::api::stableHloBufferToXlaHlo(rawBytecodeBuffer.data(),
                                         rawBytecodeBuffer.size(),
                                         &hloModule) != XlaStatus::OK) {
-    emitError(moduleOp->getLoc(),
-              "Failed converting MLIR bytecode to XLA HLO.");
+    MLIR_EMIT_ERROR(moduleOp->getLoc())
+        << "Failed converting MLIR bytecode to XLA HLO.";
     return failure();
   }
 
@@ -101,7 +105,7 @@ FailureOr<OwningOpRef<ModuleOp>> convertFromHloModule(
   if (xla::api::xlaHloToStableHloBuffer(hloModule, &mlirBytecodeBuffer,
                                         &mlirBytecodeBufferSize) !=
       XlaStatus::OK) {
-    emitError(location, "Failed converting XLA HLO to MLIR.");
+    MLIR_EMIT_ERROR(location) << "Failed converting XLA HLO to MLIR.";
     return failure();
   }
   auto mlirByteCodeBufferDestroyer = makeDestroyer([mlirBytecodeBuffer]() {
@@ -111,7 +115,7 @@ FailureOr<OwningOpRef<ModuleOp>> convertFromHloModule(
   FailureOr<OwningOpRef<ModuleOp>> moduleOpOrFailure =
       loadMlir(mlirBytecodeBuffer, mlirBytecodeBufferSize, context);
   if (failed(moduleOpOrFailure)) {
-    emitError(location, "Failed loading MLIR coming from XLA HLO.");
+    MLIR_EMIT_ERROR(location) << "Failed loading MLIR coming from XLA HLO.";
     return failure();
   }
 
@@ -183,7 +187,8 @@ struct ShadingPropagationPass
     XlaShardingPropagationOption option = getOptionFromPassArgs();
     if (xla::api::runShardingPropagationPass(hloModule.value().get(),
                                              &option) != XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Sharding propagation pass failed.");
+      MLIR_EMIT_ERROR(moduleOp->getLoc())
+          << "Sharding propagation pass failed.";
       return signalPassFailure();
     }
 
@@ -248,7 +253,7 @@ struct SpmdPartitionerPass
     XlaSpmdPartitionerOption option = getOptionFromPassArgs();
     if (xla::api::runSpmdPartitionerPass(hloModule.value().get(), &option) !=
         XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "SPMD partitioner pass failed.");
+      MLIR_EMIT_ERROR(moduleOp->getLoc()) << "SPMD partitioner pass failed.";
       return signalPassFailure();
     }
 
@@ -314,7 +319,8 @@ struct ShadingPropagationAndSpmdPartitionerPass
     if (xla::api::runShardingPropagationAndSpmdPartitionerPasses(
             hloModule.value().get(), &shardingPropagationOption,
             &spmdPartitionerOption) != XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Sharding propagation pass failed.");
+      MLIR_EMIT_ERROR(moduleOp->getLoc())
+          << "Sharding propagation pass failed.";
       return signalPassFailure();
     }
 
@@ -380,7 +386,8 @@ struct CollectivesOptimizationPass
     XlaCollectivesOptimizationOption option = getOptionFromPassArgs();
     if (xla::api::runCollectivesOptimizationPipeline(
             hloModule.value().get(), &option) != XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Collectives optimization pass failed.");
+      MLIR_EMIT_ERROR(moduleOp->getLoc())
+          << "Collectives optimization pass failed.";
       return signalPassFailure();
     }
 
@@ -434,7 +441,7 @@ struct AutoShardingPass : public impl::AutoShardingBase<AutoShardingPass> {
 
     if (xla::api::runAutoShardingPass(hloModule.value().get(), &option) !=
         XlaStatus::OK) {
-      emitError(moduleOp->getLoc(), "Auto sharding pass failed.");
+      MLIR_EMIT_ERROR(moduleOp->getLoc()) << "Auto sharding pass failed.";
       return signalPassFailure();
     }
 
