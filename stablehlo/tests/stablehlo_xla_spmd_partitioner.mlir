@@ -1,6 +1,6 @@
 // RUN: stablehlo-opt \
 // RUN:   --stablehlo-xla-cc-lib-path="%xla_cc_lib_path" \
-// RUN:   --pass-pipeline="builtin.module(stablehlo-xla-spmd-partitioner{num_partitions=8 num_replicas=1})" \
+// RUN:   --pass-pipeline="builtin.module(stablehlo-xla-spmd-partitioner)" \
 // RUN:   --split-input-file %s \
 // RUN: | FileCheck %s
 
@@ -25,6 +25,8 @@
 // CHECK{LITERAL}:   }
 // CHECK{LITERAL}: }
 module @spmd_partitioner attributes {
+    mhlo.num_partitions = 8,
+    mhlo.num_replicas = 1,
     mhlo.cross_program_prefetches = [],
     mhlo.dynamic_parameter_bindings = [],
     mhlo.is_dynamic = false,
@@ -40,5 +42,48 @@ module @spmd_partitioner attributes {
       {mhlo.sharding = "{devices=[1,2,4]0,2,4,6,1,3,5,7 last_tile_dim_replicate}"}
       : tensor<16x16xi32>
     return %1 : tensor<16x16xi32>
+  }
+}
+
+// -----
+
+//        CHECK-LABEL: module @all_gather_cross_replica
+module @all_gather_cross_replica attributes {
+  mhlo.num_partitions = 3 : i32,
+  mhlo.num_replicas = 2 : i32
+} {
+  func.func @main(
+    %arg0: tensor<9x2xf32> {mhlo.sharding = "{devices=[3,1]0,1,2}"}
+    ) -> (tensor<9x4xf32> {mhlo.sharding = "{devices=[3,1]0,1,2}"}) {
+    %0 = "stablehlo.all_gather"(%arg0) {
+      all_gather_dim = 1 : i64,
+      channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      mhlo.sharding = "{devices=[3,1]0,1,2}"
+    } : (tensor<9x2xf32>) -> tensor<9x4xf32>
+    return %0 : tensor<9x4xf32>
+  }
+}
+
+// -----
+
+//        CHECK-LABEL: module @all_reduce_cross_replica
+module @all_reduce_cross_replica attributes {
+  mhlo.num_partitions = 3 : i32,
+  mhlo.num_replicas = 2 : i32
+} {
+  func.func @main(
+    %arg0: tensor<9x2xf32> {mhlo.sharding = "{devices=[3,1]0,1,2}"}
+    ) -> (tensor<9x2xf32> {mhlo.sharding = "{devices=[3,1]0,1,2}"}) {
+    %0 = "stablehlo.all_reduce"(%arg0) ({
+    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):
+      %1 = stablehlo.add %arg1, %arg2 : tensor<f32>
+      stablehlo.return %1 : tensor<f32>
+    }) {
+      channel_handle = #stablehlo.channel_handle<handle = 0, type = 0>,
+      replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>,
+      mhlo.sharding = "{devices=[3,1]0,1,2}"
+    } : (tensor<9x2xf32>) -> tensor<9x2xf32>
+    return %0 : tensor<9x2xf32>
   }
 }
