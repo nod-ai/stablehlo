@@ -18,7 +18,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createShadingPropagationPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSpmdPartitionerPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createShadingPropagationAndSpmdPartitionerPass();
+std::unique_ptr<OperationPass<ModuleOp>>
+createShadingPropagationAndSpmdPartitionerPass(
+    const ShadingPropagationAndSpmdPartitionerOptions& options);
 std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass();
+std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass(
+    const CollectivesOptimizationOptions& options);
 std::unique_ptr<OperationPass<ModuleOp>> createAutoShardingPass();
 
 #define GEN_PASS_REGISTRATION

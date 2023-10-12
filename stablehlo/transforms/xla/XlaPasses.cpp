@@ -566,8 +566,19 @@ createShadingPropagationAndSpmdPartitionerPass() {
   return std::make_unique<ShadingPropagationAndSpmdPartitionerPass>();
 }
 
+std::unique_ptr<OperationPass<ModuleOp>>
+createShadingPropagationAndSpmdPartitionerPass(
+    const ShadingPropagationAndSpmdPartitionerOptions& options) {
+  return std::make_unique<ShadingPropagationAndSpmdPartitionerPass>(options);
+}
+
 std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass() {
   return std::make_unique<CollectivesOptimizationPass>();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createCollectivesOptimizationPass(
+    const CollectivesOptimizationOptions& options) {
+  return std::make_unique<CollectivesOptimizationPass>(options);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createAutoShardingPass() {

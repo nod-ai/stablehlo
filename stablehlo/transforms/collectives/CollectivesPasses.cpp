@@ -1,6 +1,7 @@
 #include "CollectivesPassesCliImpl.h"
 #include "CollectivesSpmdSubPartitionerImpl.h"
 #include "CompleteCollectivesSpmdSubPartitionImpl.h"
+#include "DistributedPipelineImpl.h"
 #include "MoveDeviceDomainFromFrontendAttributesImpl.h"
 #include "MoveDeviceDomainToFrontendAttributesImpl.h"
 #include "SetCollectivesDeviceDomainImpl.h"

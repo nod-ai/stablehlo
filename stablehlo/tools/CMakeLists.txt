@@ -30,6 +30,7 @@ set(LIBS
         ${extension_libs}
         MLIROptLib
         StablehloCollectivesPasses
+        StablehloConversionsDistributedPasses
         StablehloXlaPasses
         StablehloRegister
         StablehloTestUtils

@@ -13,28 +13,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
-#define STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
+#ifndef STABLEHLO_CONVERSIONS_DISTRIBUTED_PASSES_H
+#define STABLEHLO_CONVERSIONS_DISTRIBUTED_PASSES_H
 
 #include <memory>
 
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 
 namespace mlir {
 namespace stablehlo {
-#define GEN_PASS_DECL_COLLECTIVESSPMDSUBPARTITIONER
-#define GEN_PASS_DECL_COMPLETECOLLECTIVESSPMDSUBPARTITION
-#define GEN_PASS_DECL_SETCOLLECTIVESDEVICEDOMAIN
-#define GEN_PASS_DECL_MOVEDEVICEDOMAINTOFRONTENDATTRIBUTES
-#define GEN_PASS_DECL_MOVEDEVICEDOMAINFROMFRONTENDATTRIBUTES
+#define GEN_PASS_DECL_LEGALIZEDISTRIBUTED
 #define GEN_PASS_REGISTRATION
-#include "stablehlo/transforms/collectives/Passes.h.inc"
-
-void populateDistributedPassPipeline(OpPassManager &pm);
-void registerDistributedPassPipeline();
+#include "stablehlo/conversions/distributed/Passes.h.inc"
 
 }  // namespace stablehlo
 }  // namespace mlir
 
-#endif  // STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
+#endif  // STABLEHLO_CONVERSIONS_DISTRIBUTED_PASSES_H

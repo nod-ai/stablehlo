@@ -19,6 +19,7 @@ limitations under the License.
 #include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "stablehlo/conversions/distributed/Passes.h"
 #include "stablehlo/conversions/tosa/transforms/Passes.h"
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/reference/InterpreterOps.h"
@@ -33,6 +34,8 @@ int main(int argc, char **argv) {
   mlir::stablehlo::registerPassPipelines();
   mlir::stablehlo::registerPasses();
   mlir::stablehlo::registerStablehloCollectivesTransformsPasses();
+  mlir::stablehlo::registerStablehloConversionsDistributedPasses();
+  mlir::stablehlo::registerDistributedPassPipeline();
   mlir::stablehlo::registerAllXlaPasses();
   mlir::tosa::registerStablehloLegalizeToTosaPassPass();
   mlir::tosa::registerStablehloPrepareForTosaPassPass();

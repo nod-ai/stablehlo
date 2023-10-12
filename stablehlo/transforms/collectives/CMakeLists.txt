@@ -19,6 +19,8 @@ add_mlir_dialect_library(
   StablehloBase
   StablehloTypeInference
   StablehloOps
+  StablehloConversionsDistributedPasses
+  StablehloXlaPasses
   PRIVATE
   StablehloXlaCcLibLoader
 )

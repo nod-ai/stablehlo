@@ -13,28 +13,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
-#define STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
+#ifndef STABLEHLO_TRANSFORMS_COLLECTIVES_REWRITEPATTERNS_H
+#define STABLEHLO_TRANSFORMS_COLLECTIVES_REWRITEPATTERNS_H
 
-#include <memory>
-
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
+#include "CustomCallOpTargetNameRewritePattern.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 namespace stablehlo {
-#define GEN_PASS_DECL_COLLECTIVESSPMDSUBPARTITIONER
-#define GEN_PASS_DECL_COMPLETECOLLECTIVESSPMDSUBPARTITION
-#define GEN_PASS_DECL_SETCOLLECTIVESDEVICEDOMAIN
-#define GEN_PASS_DECL_MOVEDEVICEDOMAINTOFRONTENDATTRIBUTES
-#define GEN_PASS_DECL_MOVEDEVICEDOMAINFROMFRONTENDATTRIBUTES
-#define GEN_PASS_REGISTRATION
-#include "stablehlo/transforms/collectives/Passes.h.inc"
 
-void populateDistributedPassPipeline(OpPassManager &pm);
-void registerDistributedPassPipeline();
+inline void populateShardingAnnotationOpTargetNameRewritePattern(
+    RewritePatternSet& patterns) {
+  patterns.add<CustomCallOpTargetNameRewritePattern>(
+      patterns.getContext(), "sharding.tensor_annotate", "Sharding");
+}
 
 }  // namespace stablehlo
 }  // namespace mlir
 
-#endif  // STABLEHLO_TRANSFORMS_COLLECTIVES_PASSES_H
+#endif  // STABLEHLO_TRANSFORMS_COLLECTIVES_REWRITEPATTERNS_H
