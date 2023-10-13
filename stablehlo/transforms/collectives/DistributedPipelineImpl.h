@@ -12,6 +12,7 @@ namespace stablehlo {
 
 void populateDistributedPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createLegalizeDistributed());
+  pm.addPass(createRenameEntryToMain());
   pm.addPass(createShadingPropagationAndSpmdPartitionerPass(
       ShadingPropagationAndSpmdPartitionerOptions{
           .is_spmd = true,
@@ -19,6 +20,7 @@ void populateDistributedPassPipeline(OpPassManager &pm) {
           .allow_spmd_sharding_propagation_to_parameters = ArrayRef<char>({1}),
       }));
   pm.addPass(createCollectivesOptimizationPass());
+  pm.addPass(createRenameMainToEntry());
 }
 
 void registerDistributedPassPipeline() {

@@ -1,5 +1,19 @@
 include "mlir/Pass/PassBase.td"
 
+def RenameEntryToMain
+  : Pass<"stablehlo-rename-entry-to-main", "::mlir::ModuleOp"> {
+  let summary = "Rename the entry function to \\\"main\\\".";
+  let options = [
+    Option<"entry_func", "entry_func", "std::string", /*default=*/"\"forward\"",
+      /*decription=*/"">,
+  ];
+}
+
+def RenameMainToEntry
+  : Pass<"stablehlo-rename-main-to-entry", "::mlir::ModuleOp"> {
+  let summary = "Rename the \\\"main\\\" function to entry.";
+}
+
 def CollectivesSpmdSubPartitioner
   : Pass<"stablehlo-collectives-spmd-sub-partitioner", "mlir::ModuleOp"> {
   let summary = "Partition only collective operations that have sharding annotations and operate on the super devices.";

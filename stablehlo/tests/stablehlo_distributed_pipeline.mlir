@@ -6,9 +6,11 @@
 // CHECK-LABEL: @distributed_pass_pipeline
 module @distributed_pass_pipeline attributes {
   mhlo.num_partitions = 2 : i32,
+//       CHECK: mhlo.num_replicas = 1 : i32
   mhlo.num_replicas = 1 : i32
 } {
-  func.func public @main(
+//       CHECK: func.func @forward
+  func.func @forward(
 //       CHECK: %arg0: tensor<2x3xi32> {mhlo.sharding = "{devices=[1,2]0,1}"}
     %arg0: tensor<2x6xi32>,
 //       CHECK: %arg1: tensor<3x2xi32> {mhlo.sharding = "{devices=[2,1]0,1}"}

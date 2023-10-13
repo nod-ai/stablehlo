@@ -4,4 +4,6 @@
 #include "DistributedPipelineImpl.h"
 #include "MoveDeviceDomainFromFrontendAttributesImpl.h"
 #include "MoveDeviceDomainToFrontendAttributesImpl.h"
+#include "RenameEntryToMainImpl.h"
+#include "RenameMainToEntryImpl.h"
 #include "SetCollectivesDeviceDomainImpl.h"
