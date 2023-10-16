@@ -1,3 +1,7 @@
+if (NOT STABLEHLO_ENABLE_DISTRIBUTED)
+  return()
+endif()
+
 set(LLVM_OPTIONAL_SOURCES
   XlaCcLibLoader.cpp
   XlaPasses.cpp
@@ -10,6 +14,7 @@ add_mlir_library(StablehloXlaCcLibLoader
   ${XLA_DIR}
 )
 target_include_directories(StablehloXlaCcLibLoader PUBLIC ${XLA_DIR})
+
 
 set(LLVM_TARGET_DEFINITIONS XlaPasses.td)
 mlir_tablegen(XlaPasses.h.inc -gen-pass-decls -name XlaPasses)

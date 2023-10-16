@@ -1,3 +1,7 @@
+if (NOT STABLEHLO_ENABLE_DISTRIBUTED)
+  return()
+endif()
+
 set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name StablehloCollectivesTransforms)
 add_public_tablegen_target(StablehloCollectivesPassesIncGen)

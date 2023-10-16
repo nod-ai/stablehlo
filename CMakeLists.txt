@@ -144,8 +144,9 @@ if(STABLEHLO_ENABLE_BINDINGS_PYTHON)
 endif()
 
 #-------------------------------------------------------------------------------
-# XLA configuration
+# Distributed configuration
 #-------------------------------------------------------------------------------
+option(STABLEHLO_ENABLE_DISTRIBUTED "Build distributed parts of StableHLO like XLA passes." OFF)
 set(XLA_DIR "" CACHE FILEPATH "Path to the XLA source code.")
 
 #-------------------------------------------------------------------------------

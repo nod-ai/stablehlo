@@ -99,7 +99,8 @@ Here's how to build the StableHLO repo on Linux or macOS:
      -DLLVM_ENABLE_LLD="$LLVM_ENABLE_LLD" \
      -DCMAKE_BUILD_TYPE=Release \
      -DLLVM_ENABLE_ASSERTIONS=On \
-     -DMLIR_DIR=${PWD}/../llvm-build/lib/cmake/mlir
+     -DMLIR_DIR=${PWD}/../llvm-build/lib/cmake/mlir \
+     -DSTABLEHLO_ENABLE_DISTRIBUTED=ON \
      -DXLA_DIR=${PWD}/../xla
    ```
 
